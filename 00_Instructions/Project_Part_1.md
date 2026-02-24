@@ -61,7 +61,7 @@ Use a project structure like this:
 
 ### Day 1, Phase 2, the data
 
-- [ ] Create a python function (**Function 1**, but you'll have to call it something else) that downloads all the required datasets into the `downloads` directory.
+- [ X] Create a python function (**Function 1**, but you'll have to call it something else) that downloads all the required datasets into the `downloads` directory.
 - [ ] Create another function (**Function 2**, again, call it something PEP8 compatible) that merges the map with the datasets. Use `geopandas`. Make sure the left dataframe is the `geopandas` dataframe. See if there are changes needed in order for the merges to work.
 - [ ] You decide the create a Class to better handle the data for the project. All names you use __must be PEP8 compliant, like the entire project__.
 - [ ] Make a test for Function 1 and one for Function 2, in the appropriate place. If one runs **pytest** in the main directory of the project, all the tests must run.
