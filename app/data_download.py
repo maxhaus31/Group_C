@@ -1,6 +1,8 @@
 import os
 import requests
 
+import geopandas as gpd
+world = gpd.read_file("ne_110m_admin_0_countries.zip")
 
 DOWNLOADS_DIR = os.path.join(os.path.dirname(__file__), "..", "downloads")
 
@@ -12,7 +14,6 @@ DATASETS = {
     # 5th dataset added. Change if needed
     "forest_area_share": "https://ourworldindata.org/grapher/forest-area-as-share-of-land-area.csv?v=1&csvType=full&useColumnShortNames=true",
     # Fix the map dataset URL
-    #"map": "https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_countries.zip",
 }
 
 
