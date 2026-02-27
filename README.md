@@ -14,3 +14,5 @@ Food and Agriculture Organization of the United Nations (2025) – with major pr
 Protected Planet WDPA and WD-OECM data, UNEP-WCMC and IUCN, via World Bank (2026) – processed by Our World in Data. “Terrestrial protected areas (% of total land area)” [dataset]. Protected Planet WDPA and WD-OECM data, UNEP-WCMC and IUCN, via World Bank, “World Development Indicators 125” [original data].
 
 United Nations Convention to Combat Desertification – processed by Our World in Data. “Proportion of land that is degraded over total land area (%)” [dataset]. United Nations Convention to Combat Desertification, “Data from multiple sources” [original data].
+
+Test Jonas
