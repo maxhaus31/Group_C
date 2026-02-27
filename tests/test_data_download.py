@@ -18,3 +18,4 @@ def test_files_not_empty():
         extension = ".zip" if url.endswith(".zip") else ".csv"
         file_path = os.path.join(DOWNLOADS_DIR, f"{name}{extension}")
         assert os.path.getsize(file_path) > 0, f"Empty file: {name}{extension}"
+
