@@ -52,6 +52,7 @@ def download_datasets(downloads_dir: str = DOWNLOADS_DIR) -> None:
 
 def merge_datasets_with_map(
     downloads_dir: str = DOWNLOADS_DIR,
+    world_map: gpd.GeoDataFrame | None = None,
 ) -> dict[str, gpd.GeoDataFrame]:
     """
     Merges the Natural Earth world map with each CSV dataset.
@@ -64,6 +65,8 @@ def merge_datasets_with_map(
     Args:
         downloads_dir: Path to the directory containing the downloaded files.
                        Defaults to the standard DOWNLOADS_DIR constant.
+        world_map: Optional preloaded world map GeoDataFrame. If provided,
+                   the function reuses it instead of reading map_dataset.zip.
 
     Returns:
         A dictionary mapping each dataset name (str) to a merged GeoDataFrame.
@@ -75,14 +78,17 @@ def merge_datasets_with_map(
                            Run download_datasets() first.
         ValueError: If a CSV is missing the expected 'Code' or 'Year' columns.
     """
-    map_path = os.path.join(downloads_dir, "map_dataset.zip")
-    if not os.path.exists(map_path):
-        raise FileNotFoundError(
-            f"Map file not found at '{map_path}'. Please run download_datasets() first."
-        )
+    if world_map is None:
+        map_path = os.path.join(downloads_dir, "map_dataset.zip")
+        if not os.path.exists(map_path):
+            raise FileNotFoundError(
+                f"Map file not found at '{map_path}'. Please run download_datasets() first."
+            )
 
-    print("[INFO] Loading world map...")
-    world: gpd.GeoDataFrame = gpd.read_file(map_path)
+        print("[INFO] Loading world map...")
+        world: gpd.GeoDataFrame = gpd.read_file(map_path)
+    else:
+        world = world_map.copy()
 
     # Keep only the columns we need from the shapefile.
     # ISO_A3 is the standard 3-letter code column in Natural Earth.
