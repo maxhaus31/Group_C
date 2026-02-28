@@ -2,8 +2,8 @@ import os
 import pandas as pd
 import geopandas as gpd
 import pytest
-from unittest.mock import MagicMock, patch
-from app.data_download import merge_datasets_with_map, DOWNLOADS_DIR, DATASETS, CSV_DATASETS
+from unittest.mock import patch
+from app.data_download import merge_datasets_with_map, CSV_DATASETS
 from shapely.geometry import Point
 
 
@@ -28,7 +28,7 @@ def _make_fake_world_gdf() -> gpd.GeoDataFrame:
     )
 
 
-def _write_fake_downloads(self, downloads_dir: str, fake_world: gpd.GeoDataFrame) -> None:
+def _write_fake_downloads(downloads_dir: str, fake_world: gpd.GeoDataFrame) -> None:
     """
     Write a fake map ZIP + one CSV per CSV_DATASETS entry into downloads_dir.
     The map is saved as a GeoPackage inside a zip so geopandas can read it,
@@ -47,34 +47,34 @@ def _write_fake_downloads(self, downloads_dir: str, fake_world: gpd.GeoDataFrame
     # Write a placeholder zip so the FileNotFoundError check passes
     open(os.path.join(downloads_dir, "map_dataset.zip"), "wb").close()
 
-def test_returns_dict_with_all_dataset_keys(self, tmp_downloads: str) -> None:
+def test_returns_dict_with_all_dataset_keys(tmp_downloads: str) -> None:
     """merge_datasets_with_map() must return one GeoDataFrame per CSV dataset."""
     fake_world = _make_fake_world_gdf()
-    self._write_fake_downloads(tmp_downloads, fake_world)
+    _write_fake_downloads(tmp_downloads, fake_world)
 
-    with patch("app.data.gpd.read_file", return_value=fake_world):
+    with patch("app.data_download.gpd.read_file", return_value=fake_world):
         result = merge_datasets_with_map(downloads_dir=tmp_downloads)
 
     assert set(result.keys()) == set(CSV_DATASETS.keys())
 
-def test_result_values_are_geodataframes(self, tmp_downloads: str) -> None:
+def test_result_values_are_geodataframes(tmp_downloads: str) -> None:
     """Every value in the returned dict must be a GeoDataFrame (geometry preserved)."""
     fake_world = _make_fake_world_gdf()
-    self._write_fake_downloads(tmp_downloads, fake_world)
+    _write_fake_downloads(tmp_downloads, fake_world)
 
-    with patch("app.data.gpd.read_file", return_value=fake_world):
+    with patch("app.data_download.gpd.read_file", return_value=fake_world):
         result = merge_datasets_with_map(downloads_dir=tmp_downloads)
 
     for name, gdf in result.items():
         assert isinstance(gdf, gpd.GeoDataFrame), f"'{name}' is not a GeoDataFrame"
         assert "geometry" in gdf.columns, f"'{name}' is missing geometry column"
 
-def test_uses_most_recent_year_only(self, tmp_downloads: str) -> None:
+def test_uses_most_recent_year_only(tmp_downloads: str) -> None:
     """Only rows for the most recent year in each CSV must appear in the merged result."""
     fake_world = _make_fake_world_gdf()
-    self._write_fake_downloads(tmp_downloads, fake_world)
+    _write_fake_downloads(tmp_downloads, fake_world)
 
-    with patch("app.data.gpd.read_file", return_value=fake_world):
+    with patch("app.data_download.gpd.read_file", return_value=fake_world):
         result = merge_datasets_with_map(downloads_dir=tmp_downloads)
 
     # The fake CSVs have years 2019 and 2020; only 2020 rows should be merged.
@@ -91,15 +91,15 @@ def test_uses_most_recent_year_only(self, tmp_downloads: str) -> None:
                 f"USA should have NaN (no 2020 row) in '{name}'"
             )
 
-def test_row_count_equals_map_country_count(self, tmp_downloads: str) -> None:
+def test_row_count_equals_map_country_count(tmp_downloads: str) -> None:
     """
     The left join must preserve every row in the world map —
     no countries should be dropped even if they have no data.
     """
     fake_world = _make_fake_world_gdf()
-    self._write_fake_downloads(tmp_downloads, fake_world)
+    _write_fake_downloads(tmp_downloads, fake_world)
 
-    with patch("app.data.gpd.read_file", return_value=fake_world):
+    with patch("app.data_download.gpd.read_file", return_value=fake_world):
         result = merge_datasets_with_map(downloads_dir=tmp_downloads)
 
     expected_rows = len(fake_world)
@@ -109,22 +109,22 @@ def test_row_count_equals_map_country_count(self, tmp_downloads: str) -> None:
             "(all world countries must be present)"
         )
 
-def test_raises_if_map_file_missing(self, tmp_downloads: str) -> None:
+def test_raises_if_map_file_missing(tmp_downloads: str) -> None:
     """FileNotFoundError must be raised when the map ZIP is absent."""
     with pytest.raises(FileNotFoundError, match="map_dataset.zip"):
         merge_datasets_with_map(downloads_dir=tmp_downloads)
 
-def test_raises_if_csv_file_missing(self, tmp_downloads: str) -> None:
+def test_raises_if_csv_file_missing(tmp_downloads: str) -> None:
     """FileNotFoundError must be raised when a CSV dataset file is absent."""
     fake_world = _make_fake_world_gdf()
     # Write map placeholder but NO CSVs
     open(os.path.join(tmp_downloads, "map_dataset.zip"), "wb").close()
 
-    with patch("app.data.gpd.read_file", return_value=fake_world):
+    with patch("app.data_download.gpd.read_file", return_value=fake_world):
         with pytest.raises(FileNotFoundError):
             merge_datasets_with_map(downloads_dir=tmp_downloads)
 
-def test_raises_on_missing_code_column(self, tmp_downloads: str) -> None:
+def test_raises_on_missing_code_column(tmp_downloads: str) -> None:
     """ValueError must be raised if a CSV is missing the 'Code' column."""
     fake_world = _make_fake_world_gdf()
     open(os.path.join(tmp_downloads, "map_dataset.zip"), "wb").close()
@@ -134,7 +134,7 @@ def test_raises_on_missing_code_column(self, tmp_downloads: str) -> None:
     bad_csv = pd.DataFrame({"Entity": ["Germany"], "Year": [2020], "metric": [1.0]})
     bad_csv.to_csv(os.path.join(tmp_downloads, f"{first_name}.csv"), index=False)
 
-    with patch("app.data.gpd.read_file", return_value=fake_world):
+    with patch("app.data_download.gpd.read_file", return_value=fake_world):
         with pytest.raises(ValueError, match="Code"):
             merge_datasets_with_map(downloads_dir=tmp_downloads)
 
