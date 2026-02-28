@@ -51,4 +51,3 @@ def test_project_data_init_runs_pipeline_and_sets_attributes(tmp_path) -> None:
 	assert set(project_data.merged_datasets.keys()) == set(CSV_DATASETS.keys())
 	assert isinstance(project_data.world_map, gpd.GeoDataFrame)
 	assert project_data.annual_change_forest_area.equals(fake_raw_df)
-
