@@ -113,7 +113,7 @@ def merge_datasets_with_map(
         df: pd.DataFrame = pd.read_csv(csv_path)
 
         # --- Validate expected columns -----------------------------------------
-        required_columns = {"Code", "Year"}
+        required_columns = {"code", "year"}
         missing = required_columns - set(df.columns)
         if missing:
             raise ValueError(
@@ -125,30 +125,30 @@ def merge_datasets_with_map(
         # OWID CSVs include aggregate rows (e.g. "World", "Africa") whose Code
         # is either NaN or does not look like an ISO 3-letter code (3 uppercase
         # letters). We drop those so they don't pollute the map merge.
-        df = df[df["Code"].notna()]
-        df = df[df["Code"].str.match(r"^[A-Z]{3}$", na=False)]
+        df = df[df["code"].notna()]
+        df = df[df["code"].str.match(r"^[A-Z]{3}$", na=False)]
 
         # --- Select the most recent year dynamically ---------------------------
-        most_recent_year: int = int(df["Year"].max())
+        most_recent_year: int = int(df["year"].max())
         print(f"         Most recent year for '{name}': {most_recent_year}")
-        df_recent: pd.DataFrame = df[df["Year"] == most_recent_year].copy()
+        df_recent: pd.DataFrame = df[df["year"] == most_recent_year].copy()
 
         # Drop Year and Entity columns before merging — they are redundant once
         # we have the map's NAME and CONTINENT columns.
-        cols_to_drop = [c for c in ["Year", "Entity"] if c in df_recent.columns]
+        cols_to_drop = [c for c in ["year", "entity"] if c in df_recent.columns]
         df_recent = df_recent.drop(columns=cols_to_drop)
 
         # --- Merge (left = GeoDataFrame so geometry is always preserved) -------
         merged_gdf: gpd.GeoDataFrame = world.merge(
             df_recent,
             left_on="ISO_A3",
-            right_on="Code",
+            right_on="code",
             how="left",
         )
 
         # Drop the redundant 'Code' column (same info as ISO_A3)
         if "Code" in merged_gdf.columns:
-            merged_gdf = merged_gdf.drop(columns=["Code"])
+            merged_gdf = merged_gdf.drop(columns=["code"])
 
         merged[name] = merged_gdf
         print(f"[OK] '{name}' merged — {merged_gdf.shape[0]} countries, "
