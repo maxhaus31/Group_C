@@ -2,6 +2,7 @@ import os
 import requests
 import pandas as pd
 import geopandas as gpd
+from typing import Optional
 
 DOWNLOADS_DIR = os.path.join(os.path.dirname(__file__), "..", "downloads")
 
@@ -52,7 +53,7 @@ def download_datasets(downloads_dir: str = DOWNLOADS_DIR) -> None:
 
 def merge_datasets_with_map(
     downloads_dir: str = DOWNLOADS_DIR,
-    world_map: gpd.GeoDataFrame | None = None,
+    world_map: Optional[gpd.GeoDataFrame] = None,
 ) -> dict[str, gpd.GeoDataFrame]:
     """
     Merges the Natural Earth world map with each CSV dataset.
