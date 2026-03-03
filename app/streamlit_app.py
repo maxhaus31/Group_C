@@ -55,7 +55,7 @@ data = load_data()
 # Sidebar — dataset selector
 # ---------------------------------------------------------------------------
 st.sidebar.image(
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Okavango_Delta.jpg/800px-Okavango_Delta.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/d/d0/Okavango_delta_-_Botswana_-_panoramio.jpg",
     use_container_width=True,
     caption="Okavango Delta, Botswana",
 )
@@ -95,7 +95,7 @@ value_col = data.get_value_column(selected_key)
 # Find the most recent year that was used (stored in the column label or
 # inferred from the data — we show it as a friendly info box).
 st.info(
-    f"📊 **Column plotted:** `{value_col}`  |  "
+    # f"📊 **Column plotted:** `{value_col}`  |  "
     f"**Countries with data:** {gdf[value_col].notna().sum()} / {len(gdf)}"
 )
 
