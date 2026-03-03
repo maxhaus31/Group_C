@@ -57,19 +57,6 @@ def download_datasets(downloads_dir: str = DOWNLOADS_DIR) -> None:
         print(f"[OK] {name} saved to {file_path}")
 
 
-<<<<<<< Updated upstream
-def merge_datasets_with_map(
-    downloads_dir: str = DOWNLOADS_DIR,
-    world_map: Optional[gpd.GeoDataFrame] = None,
-) -> dict[str, gpd.GeoDataFrame]:
-    """
-    Merges the Natural Earth world map with each CSV dataset.
-
-    For each dataset, only the most recent year of data is used (determined
-    dynamically — never hardcoded). The merge is performed on ISO 3-letter
-    country codes (ISO_A3 in the shapefile, Code in the OWID CSVs), with the
-    GeoDataFrame always on the left so that geometry is preserved.
-=======
 
 def merge_datasets_with_map(downloads_dir: str = DOWNLOADS_DIR, 
                             world_map: gpd.GeoDataFrame | None = None,) -> dict[str, gpd.GeoDataFrame]:
@@ -95,7 +82,6 @@ def merge_datasets_with_map(downloads_dir: str = DOWNLOADS_DIR,
         FileNotFoundError: If the map shapefile or a CSV file is not found.
                            Run download_datasets() first.
         ValueError: If a CSV is missing the expected 'Code' or 'Year' columns.
->>>>>>> Stashed changes
     """
 
     # Check if the map is already provided. Raise an error if missing and not provided.
@@ -112,13 +98,10 @@ def merge_datasets_with_map(downloads_dir: str = DOWNLOADS_DIR,
     else:
         world = world_map.copy()
 
-<<<<<<< Updated upstream
-=======
     # Keep only the columns we need from the shapefile.
     # ISO_A3 is the standard 3-letter code column in Natural Earth.
     # Disputed/unrecognised territories (ISO_A3 = '-99') are kept, but they 
     # won't match any OWID row.
->>>>>>> Stashed changes
     world = world[["ISO_A3", "NAME", "CONTINENT", "geometry"]].copy()
 
     # Store merged GeoDataFrames in a dictionary keyed by dataset name
@@ -137,24 +120,7 @@ def merge_datasets_with_map(downloads_dir: str = DOWNLOADS_DIR,
         print(f"[INFO] Processing '{name}'...")
         df: pd.DataFrame = pd.read_csv(csv_path)
 
-<<<<<<< Updated upstream
-        # --- Normalise key column names to canonical case ----------------------
-        # OWID occasionally ships lowercase headers (code/year/entity).
-        rename: dict[str, str] = {}
-        for col in df.columns:
-            if col.lower() == "entity":
-                rename[col] = "Entity"
-            elif col.lower() == "code":
-                rename[col] = "Code"
-            elif col.lower() == "year":
-                rename[col] = "Year"
-        if rename:
-            df = df.rename(columns=rename)
-
-        # --- Validate expected columns -----------------------------------------
-=======
         # Validate that required columns are present. Raise an error if missing.
->>>>>>> Stashed changes
         required_columns = {"Code", "Year"}
         missing = required_columns - set(df.columns)
 
@@ -164,11 +130,7 @@ def merge_datasets_with_map(downloads_dir: str = DOWNLOADS_DIR,
                 f"Found columns: {list(df.columns)}"
             )
 
-<<<<<<< Updated upstream
-        # --- Filter to valid country-level rows only ---------------------------
-=======
         # Filter to valid country-level rows only. Drop invalid and NaN codes to avoid pollution of the merge. 
->>>>>>> Stashed changes
         df = df[df["Code"].notna()]
         df = df[df["Code"].astype(str).str.match(r"^[A-Z]{3}$", na=False)]
 
@@ -177,11 +139,7 @@ def merge_datasets_with_map(downloads_dir: str = DOWNLOADS_DIR,
         print(f"         Most recent year for '{name}': {most_recent_year}")
         df_recent: pd.DataFrame = df[df["Year"] == most_recent_year].copy()
 
-<<<<<<< Updated upstream
-        # Drop redundant columns before merging (optional)
-=======
         # Drop Year and Entity columns before merging.
->>>>>>> Stashed changes
         cols_to_drop = [c for c in ["Year", "Entity"] if c in df_recent.columns]
         if cols_to_drop:
             df_recent = df_recent.drop(columns=cols_to_drop)
@@ -194,11 +152,7 @@ def merge_datasets_with_map(downloads_dir: str = DOWNLOADS_DIR,
             how="left",
         )
 
-<<<<<<< Updated upstream
         # Drop redundant join key from OWID side (same info as ISO_A3)
-=======
-        # Drop the redundant 'Code' column
->>>>>>> Stashed changes
         if "Code" in merged_gdf.columns:
             merged_gdf = merged_gdf.drop(columns=["Code"])
 
