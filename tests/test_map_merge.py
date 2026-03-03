@@ -11,7 +11,15 @@ from app.data_download import merge_datasets_with_map, CSV_DATASETS
 
 
 def _fake_world() -> gpd.GeoDataFrame:
-    """Tiny world map with three countries."""
+    """
+    Create a minimal fake world map for testing merge logic.
+
+    Returns 3 fake countries (AAA, BBB, CCC) that mimic the Natural Earth
+    shapefile structure. Used by all tests to provide consistent world data.
+
+    Returns:
+        GeoDataFrame with ISO_A3, NAME, CONTINENT, geometry columns
+    """
     return gpd.GeoDataFrame(
         {
             "ISO_A3": ["AAA", "BBB", "CCC"],
@@ -27,29 +35,39 @@ def _write_csv(
     path: str,
     rows: List[Dict],
 ) -> None:
-    """Write a minimal OWID-style CSV."""
+    """
+    Write test CSV data in Our World in Data format.
+
+    Creates minimal CSV files with Entity/Code/Year/metric columns that
+    merge_datasets_with_map requires.
+    """
     pd.DataFrame(rows).to_csv(path, index=False)
 
 
 @pytest.fixture()
 def tmp_downloads(tmp_path: os.PathLike) -> str:
-    """Fresh temporary directory to use as downloads_dir."""
+    """Provide fresh temporary downloads directory for each test."""
     return str(tmp_path)
 
 
 def _prepare_map_and_empty_zip(tmp_downloads: str, world: gpd.GeoDataFrame) -> None:
-    """Create placeholder map ZIP and mock read_file."""
+    """
+    Create empty map ZIP file so file existence checks pass.
+    Mocks gpd read_file separately to return test data.
+    """
     open(os.path.join(tmp_downloads, "map_dataset.zip"), "wb").close()
 
 
 def test_returns_dict_with_all_dataset_keys(tmp_downloads: str) -> None:
     """
-    merge_datasets_with_map() must return one GeoDataFrame per CSV dataset.
+    Test merge_datasets_with_map() returns dict with one GeoDataFrame per dataset.
+
+    1. Result is dict with all CSV_DATASETS keys
+    2. Each value is GeoDataFrame with geometry column preserved
     """
     world = _fake_world()
     _prepare_map_and_empty_zip(tmp_downloads, world)
 
-    # Minimal valid CSV: one row per country, one year.
     base_rows = [
         {"Entity": "Country_AAA", "Code": "AAA", "Year": 2020, "metric": 1.0},
         {"Entity": "Country_BBB", "Code": "BBB", "Year": 2020, "metric": 2.0},
@@ -72,7 +90,14 @@ def test_returns_dict_with_all_dataset_keys(tmp_downloads: str) -> None:
 
 def test_filters_out_aggregate_and_invalid_codes(tmp_downloads: str) -> None:
     """
-    Aggregate / invalid codes (non 3‑letter) must not affect merged data.
+    Test merge_datasets_with_map() ignores aggregate rows and invalid country codes.
+
+    Verifies regex filter ^[A-Z]{3}$ excludes:
+    1. Empty Code: ""
+    2. 4+ letters: EU27
+    3. 2 letters: AB
+
+    Only exact 3-letter ISO codes get merged.
     """
     world = _fake_world()
     _prepare_map_and_empty_zip(tmp_downloads, world)
@@ -108,12 +133,15 @@ def test_filters_out_aggregate_and_invalid_codes(tmp_downloads: str) -> None:
 
 def test_left_join_preserves_all_map_countries(tmp_downloads: str) -> None:
     """
-    All map countries must be present; countries with no data get NaN.
+    Test left join keeps all world map countries, even without CSV data.
+
+    1. Row count matches world map exactly
+    2. Countries with CSV data get values
+    3. Countries without CSV data get NaN
     """
     world = _fake_world()
     _prepare_map_and_empty_zip(tmp_downloads, world)
 
-    # Only AAA and BBB have data.
     rows = [
         {"Entity": "Country_AAA", "Code": "AAA", "Year": 2020, "metric": 5.0},
         {"Entity": "Country_BBB", "Code": "BBB", "Year": 2020, "metric": 6.0},

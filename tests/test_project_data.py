@@ -8,7 +8,16 @@ from app.project_data import ProjectData, ProjectDataConfig
 
 
 def _make_fake_world_gdf() -> gpd.GeoDataFrame:
-	"""Return a tiny world-like GeoDataFrame used for fast tests."""
+	"""
+    Create a minimal fake world map for testing merge logic.
+
+    Returns a tiny GeoDataFrame with 2 countries (Germany, Brazil) that mimics
+    the real Natural Earth shapefile structure. Used to test merging without
+    downloading the real 200MB world map.
+
+    Returns:
+        GeoDataFrame with ISO_A3, NAME, CONTINENT, geometry columns
+    """
 	return gpd.GeoDataFrame(
 		{
 			"ISO_A3": ["DEU", "BRA"],
@@ -21,7 +30,15 @@ def _make_fake_world_gdf() -> gpd.GeoDataFrame:
 
 
 def test_project_data_init_runs_pipeline_and_sets_attributes(tmp_path) -> None:
-	"""ProjectData init should run both functions and expose loaded attributes."""
+	"""
+    Test that ProjectData.__init__() runs the full data pipeline correctly.
+
+    1. download_datasets is called once
+    2. merge_datasets_with_map is called once
+    3. All CSV files are read
+    4. raw_datasets, merged_datasets, and world_map attributes are populated
+    5. Individual dataset access works (project_data.annual_change_forest_area, etc. )
+    """
 	fake_world = _make_fake_world_gdf()
 	fake_raw_df = pd.DataFrame(
 		{
