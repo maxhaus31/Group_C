@@ -18,9 +18,8 @@ import geopandas as gpd
 import pandas as pd
 from pydantic import BaseModel, field_validator
 
-# ---------------------------------------------------------------------------
+
 # Re-use the two core functions already written in data_download.py
-# ---------------------------------------------------------------------------
 from app.data_download import (
     CSV_DATASETS,
     DATASETS,
@@ -30,10 +29,7 @@ from app.data_download import (
 )
 
 
-# ---------------------------------------------------------------------------
 # Pydantic configuration model
-# ---------------------------------------------------------------------------
-
 class OkavangoConfig(BaseModel):
     """Validated configuration for the OkavangoData class."""
 
@@ -47,9 +43,7 @@ class OkavangoConfig(BaseModel):
         return v
 
 
-# ---------------------------------------------------------------------------
 # Main class
-# ---------------------------------------------------------------------------
 
 class OkavangoData:
     """
@@ -112,15 +106,15 @@ class OkavangoData:
         )
         self.downloads_dir: str = config.downloads_dir
 
-        # --- Step 1: download -------------------------------------------------
+        # Step 1: download
         download_datasets(downloads_dir=self.downloads_dir)
 
-        # --- Step 2: merge ----------------------------------------------------
+        # Step 2: merge
         self.merged: dict[str, gpd.GeoDataFrame] = merge_datasets_with_map(
             downloads_dir=self.downloads_dir
         )
 
-        # --- Step 3: expose individual GeoDataFrames as attributes ------------
+        # Step 3: expose individual GeoDataFrames as attributes
         self.annual_change_forest_area: gpd.GeoDataFrame = self.merged[
             "annual_change_forest_area"
         ]
@@ -129,9 +123,7 @@ class OkavangoData:
         self.share_land_degraded: gpd.GeoDataFrame = self.merged["share_land_degraded"]
         self.forest_area_share: gpd.GeoDataFrame = self.merged["forest_area_share"]
 
-    # ------------------------------------------------------------------
     # Public helpers
-    # ------------------------------------------------------------------
 
     def get_value_column(self, dataset_key: str) -> str:
         """

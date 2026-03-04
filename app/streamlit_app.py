@@ -26,9 +26,8 @@ import streamlit as st
 matplotlib.use("Agg")  # non-interactive backend required for Streamlit
 
 
-# ---------------------------------------------------------------------------
-# Page config  (must be the very first Streamlit call)
-# ---------------------------------------------------------------------------
+
+# Page config
 st.set_page_config(
     page_title="Project Okavango 🌿",
     page_icon="🌍",
@@ -36,9 +35,7 @@ st.set_page_config(
 )
 
 
-# ---------------------------------------------------------------------------
 # Load data (cached so it only runs once per session)
-# ---------------------------------------------------------------------------
 @st.cache_resource(show_spinner="Downloading & merging datasets — this may take a minute…")
 def load_data():  # type: ignore[return]
     """Instantiate OkavangoData once and cache it for the session."""
@@ -51,9 +48,8 @@ def load_data():  # type: ignore[return]
 data = load_data()
 
 
-# ---------------------------------------------------------------------------
-# Sidebar — dataset selector
-# ---------------------------------------------------------------------------
+
+# Sidebar Formatting
 st.sidebar.image(
     "https://upload.wikimedia.org/wikipedia/commons/d/d0/Okavango_delta_-_Botswana_-_panoramio.jpg",
     use_container_width=True,
@@ -78,9 +74,8 @@ st.sidebar.markdown(
 )
 
 
-# ---------------------------------------------------------------------------
-# Main area header
-# ---------------------------------------------------------------------------
+
+# Main area header creation
 display_name = data.DISPLAY_NAMES[selected_key]
 
 st.title(f"🌍 {display_name}")
@@ -92,17 +87,15 @@ st.markdown(
 gdf = data.merged[selected_key]
 value_col = data.get_value_column(selected_key)
 
-# Find the most recent year that was used (stored in the column label or
-# inferred from the data — we show it as a friendly info box).
+# Find the most recent year that was used
 st.info(
     # f"📊 **Column plotted:** `{value_col}`  |  "
     f"**Countries with data:** {gdf[value_col].notna().sum()} / {len(gdf)}"
 )
 
 
-# ---------------------------------------------------------------------------
+
 # World choropleth map
-# ---------------------------------------------------------------------------
 
 def render_choropleth(gdf_plot, col: str, title: str) -> plt.Figure:
     """Render a choropleth world map using GeoPandas + Matplotlib."""
@@ -159,9 +152,7 @@ with st.spinner("Rendering map…"):
 
 plt.close("all")
 
-# ---------------------------------------------------------------------------
 # Top / Bottom bar chart
-# ---------------------------------------------------------------------------
 st.markdown("---")
 st.subheader(f"Top 5 & Bottom 5 Countries — {display_name}")
 
@@ -216,9 +207,7 @@ fig_bar.update_layout(
 st.plotly_chart(fig_bar, use_container_width=True)
 
 
-# ---------------------------------------------------------------------------
-# Raw data expander (bonus — useful for debugging / exploration)
-# ---------------------------------------------------------------------------
+# Raw data expander
 with st.expander("🔍 Explore raw merged data"):
     display_cols = ["NAME", "CONTINENT", value_col]
     st.dataframe(
