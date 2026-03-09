@@ -58,8 +58,10 @@ def download_datasets(downloads_dir: str = DOWNLOADS_DIR) -> None:
 
 
 
-def merge_datasets_with_map(downloads_dir: str = DOWNLOADS_DIR, 
-                            world_map: gpd.GeoDataFrame | None = None,) -> dict[str, gpd.GeoDataFrame]:
+def merge_datasets_with_map(
+    downloads_dir: str = DOWNLOADS_DIR,
+    world_map: Optional[gpd.GeoDataFrame] = None,
+    ) -> dict[str, gpd.GeoDataFrame]:
     """
     Merges the Natural Earth world map with each CSV dataset.
 
@@ -121,7 +123,7 @@ def merge_datasets_with_map(downloads_dir: str = DOWNLOADS_DIR,
         df: pd.DataFrame = pd.read_csv(csv_path)
 
         # Validate that required columns are present. Raise an error if missing.
-        required_columns = {"Code", "Year"}
+        required_columns = {"code", "year"}
         missing = required_columns - set(df.columns)
 
         if missing:
@@ -131,16 +133,16 @@ def merge_datasets_with_map(downloads_dir: str = DOWNLOADS_DIR,
             )
 
         # Filter to valid country-level rows only. Drop invalid and NaN codes to avoid pollution of the merge. 
-        df = df[df["Code"].notna()]
-        df = df[df["Code"].astype(str).str.match(r"^[A-Z]{3}$", na=False)]
+        df = df[df["code"].notna()]
+        df = df[df["code"].astype(str).str.match(r"^[A-Z]{3}$", na=False)]
 
         # Select only the most recent year of data.
-        most_recent_year: int = int(df["Year"].max())
+        most_recent_year: int = int(df["year"].max())
         print(f"         Most recent year for '{name}': {most_recent_year}")
-        df_recent: pd.DataFrame = df[df["Year"] == most_recent_year].copy()
+        df_recent: pd.DataFrame = df[df["year"] == most_recent_year].copy()
 
         # Drop Year and Entity columns before merging.
-        cols_to_drop = [c for c in ["Year", "Entity"] if c in df_recent.columns]
+        cols_to_drop = [c for c in ["year", "entity"] if c in df_recent.columns]
         if cols_to_drop:
             df_recent = df_recent.drop(columns=cols_to_drop)
 
@@ -148,13 +150,13 @@ def merge_datasets_with_map(downloads_dir: str = DOWNLOADS_DIR,
         merged_gdf: gpd.GeoDataFrame = world.merge(
             df_recent,
             left_on="ISO_A3",
-            right_on="Code",
+            right_on="code",
             how="left",
         )
 
         # Drop redundant join key from OWID side (same info as ISO_A3)
-        if "Code" in merged_gdf.columns:
-            merged_gdf = merged_gdf.drop(columns=["Code"])
+        if "code" in merged_gdf.columns:
+            merged_gdf = merged_gdf.drop(columns=["code"])
 
         # Store the merged GeoDataFrame in the result dictionary
         merged[name] = merged_gdf
