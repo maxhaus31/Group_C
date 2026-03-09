@@ -6,6 +6,29 @@ Korbinian Dietl: 70124@novasbe.pt
 Jonas Knosp: 72128@novasbe.pt  
 Maximilian Haussmann: 72633@novasbe.pt
 
+## Runnning Streamlit App
+
+**Interactive world maps showing data for:**
+* Annual forest area change
+* Annual deforestation rates 
+* Share of land protected 
+* Share of land degraded 
+* Forest area as % of land
+
+**Features**:
+* Dynamic dataset selector 
+* Choropleth maps 
+* Top/bottom 5 countries charts
+
+**Run it**:
+
+Step 1: Install dependecies:
+* pip install streamlit geopandas pandas
+
+Step 2: From the project root directory run either:
+* streamlit run main.py
+* python main.py
+
 ## Data Sources: 
 Food and Agriculture Organization of the United Nations (2025) – with major processing by Our World in Data. “Annual change in forest area” [dataset]. Food and Agriculture Organization of the United Nations, “Global Forest Resources Assessment 2025” [original data].
 
