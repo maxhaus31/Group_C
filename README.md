@@ -23,7 +23,7 @@ Maximilian Haussmann: 72633@novasbe.pt
 **Run it**:
 
 Step 1: Install dependecies:
-* pip install streamlit geopandas pandas
+* pip install streamlit geopandas pandas plotly
 
 Step 2: From the project root directory run either:
 * streamlit run main.py
