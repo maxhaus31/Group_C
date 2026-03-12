@@ -32,7 +32,28 @@ from pathlib import Path
 import requests
 import streamlit as st
 import yaml
+from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut
 from PIL import Image
+
+# ---------------------------------------------------------------------------
+# Location helper
+# ---------------------------------------------------------------------------
+
+def _reverse_geocode(lat: float, lon: float) -> str:
+    """Get city/region name from coordinates using OpenStreetMap Nominatim."""
+    try:
+        geolocator = Nominatim(user_agent="project_okavango/1.0")
+        location = geolocator.reverse(f"{lat}, {lon}", language="en", timeout=5)
+        address_parts = location.address.split(",")
+        if len(address_parts) >= 2:
+            city = address_parts[-3].strip() if len(address_parts) > 2 else address_parts[0].strip()
+            country = address_parts[-1].strip()
+            return f"{city}, {country}"
+        return location.address
+    except (GeocoderTimedOut, Exception):
+        return f"{lat:.4f}, {lon:.4f}"
+
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -376,6 +397,8 @@ def render() -> None:
             description=cached["image_description"],
             risk_text=cached["text_description"],
             danger=cached["danger"].strip().upper() == "Y",
+            lat=lat,
+            lon=lon,
         )
         return
 
@@ -438,7 +461,7 @@ def render() -> None:
         )
         status.update(label="✅ Pipeline complete!", state="complete")
 
-    _display_results(image_path, description, risk_text, danger)
+    _display_results(image_path, description, risk_text, danger, lat, lon)
 
 
 def _display_results(
@@ -446,8 +469,17 @@ def _display_results(
     description: str,
     risk_text: str,
     danger: bool,
+    lat: float = None,
+    lon: float = None,
 ) -> None:
     """Render the image, description, and risk assessment side by side."""
+
+    # Location header
+    if lat is not None and lon is not None:
+        location = _reverse_geocode(lat, lon)
+        st.markdown(f"### 📍 {location}")
+        st.caption(f"Coordinates: {lat:.4f}, {lon:.4f}")
+        st.markdown("---")
 
     # Risk banner at the top
     if danger:
