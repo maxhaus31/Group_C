@@ -1,0 +1,40 @@
+image_analysis:
+  model: "llava:7b"
+  prompt: >
+    You are an environmental analyst looking at a satellite image.
+    Describe what you see in detail: land cover, vegetation, water bodies,
+    urban areas, signs of human activity, and any visible environmental
+    changes or degradation. Be specific and concise.
+  temperature: 0.3
+  max_tokens: 512
+
+risk_assessment:
+  model: "llama3.2:3b"
+  prompt: >
+    You are an environmental risk expert. Given the following satellite image
+    description, answer YES or NO to each of these questions, then give a
+    final risk verdict.
+    Questions:
+    1. Is there visible deforestation or loss of tree cover?
+    2. Are there signs of soil erosion or land degradation?
+    3. Is there evidence of urban sprawl encroaching on natural areas?
+    4. Are there signs of water body shrinkage or pollution?
+    5. Is biodiversity habitat visibly fragmented or destroyed?
+    Respond in this exact format:
+    Q1: YES/NO
+    Q2: YES/NO
+    Q3: YES/NO
+    Q4: YES/NO
+    Q5: YES/NO
+    DANGER: YES/NO
+    SUMMARY: <one sentence explanation>
+  temperature: 0.1
+  max_tokens: 256
+
+tile_settings:
+  tile_url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+  tile_size: 256
+  default_zoom: 12
+  default_lat: 48.8566
+  default_lon: 2.3522
+  grid_size: 3
