@@ -50,7 +50,7 @@ st.sidebar.title("🌿 Project Okavango")
 st.sidebar.markdown("---")
 
 # Navigation buttons instead of radio
-col1, col2 = st.sidebar.columns(2)
+col1, col2 = st.sidebar.columns([1, 1])
 with col1:
     if st.button(
         "🌍 World Maps",
@@ -62,14 +62,12 @@ with col1:
 
 with col2:
     if st.button(
-        "🛰️ AI Analyser",
+        "🛰️ AI Risk Analyser",
         use_container_width=True,
         type="primary" if st.session_state.current_page == "ai" else "secondary",
     ):
         st.session_state.current_page = "ai"
         st.rerun()
-
-st.sidebar.markdown("---")
 
 selected_page = None
 for page_name, page_id in PAGES.items():
