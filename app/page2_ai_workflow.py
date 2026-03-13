@@ -323,6 +323,29 @@ def _append_to_database(row: dict) -> None:
         writer.writerow(row)
 
 
+def _get_search_history(limit: int = 5) -> list[dict]:
+    """Get recently searched locations (deduplicated by lat/lon/zoom) from the database."""
+    db_rows = _read_database()
+    if not db_rows:
+        return []
+    
+    # Deduplicate by location, keeping the most recent entry for each unique location
+    seen = {}
+    for row in reversed(db_rows):  # Reverse to process newest first
+        try:
+            lat = float(row.get("latitude", 0))
+            lon = float(row.get("longitude", 0))
+            zoom = int(row.get("zoom", 0))
+            key = _image_key(lat, lon, zoom)
+            if key not in seen:
+                seen[key] = row
+        except (ValueError, TypeError):
+            continue
+    
+    # Return the most recent unique locations
+    return list(seen.values())[:limit]
+
+
 # ---------------------------------------------------------------------------
 # Main render function (called from streamlit_app.py)
 # ---------------------------------------------------------------------------
@@ -330,12 +353,23 @@ def _append_to_database(row: dict) -> None:
 def render() -> None:
     """Render Page 2 – AI Environmental Risk Workflow."""
 
+    # Initialize session state for presets
+    if "run_preset" not in st.session_state:
+        st.session_state.run_preset = False
+
     config = load_config()
     if config is None:
         config = {}
     tile_cfg = config.get("tile_settings", {})
 
-    st.title("🛰️ AI Environmental Risk Analyser")
+    # Clickable header button to reset and go back to main
+    col1, col2 = st.columns([0.9, 0.1])
+    with col1:
+        st.title("🛰️ AI Environmental Risk Analyser")
+    with col2:
+        if st.button("↩️", help="Back to main page", key="header_back"):
+            st.session_state.clear()
+            st.rerun()
     st.markdown(
         "Select a location on Earth, fetch a satellite image, and let AI assess "
         "whether the area shows signs of **environmental danger**."
@@ -347,31 +381,62 @@ def render() -> None:
     st.sidebar.markdown("---")
     st.sidebar.subheader("📍 Location Settings")
 
-    lat = st.sidebar.number_input(
-        "Latitude",
-        min_value=-90.0,
-        max_value=90.0,
-        value=float(tile_cfg.get("default_lat", 48.8566)),
-        step=0.01,
-        format="%.4f",
-    )
-    lon = st.sidebar.number_input(
-        "Longitude",
-        min_value=-180.0,
-        max_value=180.0,
-        value=float(tile_cfg.get("default_lon", 2.3522)),
-        step=0.01,
-        format="%.4f",
-    )
-    zoom = st.sidebar.slider(
-        "Zoom level",
-        min_value=5,
-        max_value=18,
-        value=int(tile_cfg.get("default_zoom", 12)),
-        help="Higher zoom = more detail but smaller area covered.",
-    )
+    # Use preset coordinates if a preset was clicked, otherwise use sidebar inputs
+    default_lat = float(tile_cfg.get("default_lat", 48.8566))
+    default_lon = float(tile_cfg.get("default_lon", 2.3522))
+    default_zoom = int(tile_cfg.get("default_zoom", 12))
+
+    if st.session_state.run_preset:
+        lat = st.session_state.preset_lat
+        lon = st.session_state.preset_lon
+        zoom = st.session_state.preset_zoom
+    else:
+        lat = st.sidebar.number_input(
+            "Latitude",
+            min_value=-90.0,
+            max_value=90.0,
+            value=default_lat,
+            step=0.01,
+            format="%.4f",
+        )
+        lon = st.sidebar.number_input(
+            "Longitude",
+            min_value=-180.0,
+            max_value=180.0,
+            value=default_lon,
+            step=0.01,
+            format="%.4f",
+        )
+        zoom = st.sidebar.slider(
+            "Zoom level",
+            min_value=5,
+            max_value=18,
+            value=default_zoom,
+            help="Higher zoom = more detail but smaller area covered.",
+        )
 
     run_btn = st.sidebar.button("🚀 Analyse Location", type="primary", use_container_width=True)
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("⭐ Quick Locations")
+    preset_locations = {
+        "Lisbon, Portugal": (38.7223, -9.1393, 12),
+        "Amazon Brazil": (-3.1190, -60.0217, 12),
+        "Indonesia Forest": (-2.5489, 113.2938, 12),
+        "Congo Basin": (0.5, 25.0, 11),
+        "Paris, France": (48.8566, 2.3522, 12),
+    }
+    selected_preset = st.sidebar.selectbox(
+        "Jump to preset:",
+        ["Custom"] + list(preset_locations.keys()),
+        index=0,
+    )
+    if selected_preset != "Custom" and selected_preset in preset_locations:
+        preset_lat, preset_lon, preset_zoom = preset_locations[selected_preset]
+        lat = preset_lat
+        lon = preset_lon
+        zoom = preset_zoom
+        st.sidebar.success(f"📍 Loaded: {selected_preset}")
 
     st.sidebar.markdown("---")
     st.sidebar.markdown(
@@ -389,8 +454,11 @@ def render() -> None:
     # Check cache before running pipeline
     # -----------------------------------------------------------------------
     cached = _find_cached(lat, lon, zoom)
+    
+    # Check if we should run the pipeline (either button click or preset)
+    should_run = run_btn or st.session_state.run_preset
 
-    if cached and not run_btn:
+    if cached and not should_run:
         st.info("⚡ **Loaded from cache** — this location was already analysed.")
         _display_results(
             image_path=Path(cached["image_path"]),
@@ -399,10 +467,11 @@ def render() -> None:
             danger=cached["danger"].strip().upper() == "Y",
             lat=lat,
             lon=lon,
+            zoom=zoom,
         )
         return
 
-    if not run_btn:
+    if not should_run:
         st.markdown(
             "👈 Set your coordinates and zoom in the sidebar, then click **Analyse Location**."
         )
@@ -461,7 +530,10 @@ def render() -> None:
         )
         status.update(label="✅ Pipeline complete!", state="complete")
 
-    _display_results(image_path, description, risk_text, danger, lat, lon)
+    _display_results(image_path, description, risk_text, danger, lat, lon, zoom)
+    
+    # Reset preset flag after displaying results
+    st.session_state.run_preset = False
 
 
 def _display_results(
@@ -471,83 +543,120 @@ def _display_results(
     danger: bool,
     lat: float = None,
     lon: float = None,
+    zoom: int = 12,
 ) -> None:
-    """Render the image, description, and risk assessment side by side."""
+    """Render the image, description, and risk assessment with tabs and metrics."""
 
-    # Location header
+    # Location header with metrics card
     if lat is not None and lon is not None:
         location = _reverse_geocode(lat, lon)
         st.markdown(f"### 📍 {location}")
-        st.caption(f"Coordinates: {lat:.4f}, {lon:.4f}")
+        
+        metric_cols = st.columns(4)
+        with metric_cols[0]:
+            st.metric("Latitude", f"{lat:.4f}")
+        with metric_cols[1]:
+            st.metric("Longitude", f"{lon:.4f}")
+        with metric_cols[2]:
+            st.metric("Zoom Level", zoom)
+        with metric_cols[3]:
+            st.metric("Date", datetime.utcnow().strftime("%Y-%m-%d"))
         st.markdown("---")
 
-    # Risk banner at the top
+    # Risk banner with severity colors
     if danger:
         st.error(
-            "🚨 **ENVIRONMENTAL RISK DETECTED** — "
-            "The AI flagged this area as potentially at risk."
+            "🚨 **ENVIRONMENTAL RISK DETECTED**  \n"
+            "The AI identified visible environmental degradation or deforestation."
         )
     else:
         st.success(
-            "✅ **No significant environmental risk detected** — "
-            "The area appears to be in good condition."
+            "✅ **Good Environmental Status**  \n"
+            "No significant environmental risk detected."
         )
 
     st.markdown("---")
-    col_img, col_desc = st.columns([1, 1], gap="large")
+    
+    # Organized tabbed interface
+    tab1, tab2, tab3 = st.tabs(["📊 Overview", "📋 Full Analysis", "🔧 Details"])
+    
+    with tab1:
+        col_img, col_desc = st.columns([1, 1], gap="large")
 
-    with col_img:
-        st.subheader("🛰️ Satellite Image")
-        if image_path.exists():
-            st.image(str(image_path), use_container_width=True)
+        with col_img:
+            st.subheader("🛰️ Satellite Image")
+            if image_path.exists():
+                st.image(str(image_path), use_container_width=True)
+            else:
+                st.warning("Image file not found.")
+
+        with col_desc:
+            st.subheader("📝 Image Description")
+            st.markdown(description)
+            
+        st.markdown("---")
+        st.subheader("⚠️ Risk Summary")
+        summary_lines = [l for l in risk_text.splitlines() if "SUMMARY:" in l.upper()]
+        if summary_lines:
+            st.info(summary_lines[0].replace("SUMMARY:", "").strip())
         else:
-            st.warning("Image file not found.")
+            st.write(risk_text[:200] + "..." if len(risk_text) > 200 else risk_text)
+    
+    with tab2:
+        st.subheader("🔬 Environmental Risk Assessment")
 
-    with col_desc:
-        st.subheader("📝 Image Description")
-        st.markdown(description)
+        # Parse and display individual question answers if present
+        lines = risk_text.splitlines()
+        q_lines = [l for l in lines if l.strip().startswith("Q")]
+        summary_lines = [l for l in lines if "SUMMARY:" in l.upper()]
+        other_lines = [l for l in lines if l not in q_lines and "DANGER:" not in l.upper() and l not in summary_lines]
 
-    st.markdown("---")
-    st.subheader("🔬 Environmental Risk Assessment")
+        if q_lines:
+            questions = {
+                "Q1": "Deforestation / tree cover loss",
+                "Q2": "Soil erosion / land degradation",
+                "Q3": "Urban sprawl on natural areas",
+                "Q4": "Water body changes / pollution",
+                "Q5": "Habitat fragmentation",
+            }
+            cols = st.columns(len(q_lines))
+            for i, line in enumerate(q_lines):
+                qkey = line.split(":")[0].strip()
+                answer = "YES" if "YES" in line.upper() else "NO"
+                label = questions.get(qkey, qkey)
+                with cols[i]:
+                    if answer == "YES":
+                        st.metric(label=label, value="⚠️ YES")
+                    else:
+                        st.metric(label=label, value="✅ NO")
+        else:
+            st.markdown(risk_text)
 
-    # Parse and display individual question answers if present
-    lines = risk_text.splitlines()
-    q_lines = [l for l in lines if l.strip().startswith("Q")]
-    summary_lines = [l for l in lines if "SUMMARY:" in l.upper()]
-    other_lines = [l for l in lines if l not in q_lines and "DANGER:" not in l.upper() and l not in summary_lines]
+        if summary_lines:
+            st.info(summary_lines[0].replace("SUMMARY:", "**Summary:**"))
 
-    if q_lines:
-        questions = {
-            "Q1": "Deforestation / tree cover loss",
-            "Q2": "Soil erosion / land degradation",
-            "Q3": "Urban sprawl on natural areas",
-            "Q4": "Water body changes / pollution",
-            "Q5": "Habitat fragmentation",
-        }
-        cols = st.columns(len(q_lines))
-        for i, line in enumerate(q_lines):
-            qkey = line.split(":")[0].strip()
-            answer = "YES" if "YES" in line.upper() else "NO"
-            label = questions.get(qkey, qkey)
-            with cols[i]:
-                if answer == "YES":
-                    st.metric(label=label, value="⚠️ YES")
-                else:
-                    st.metric(label=label, value="✅ NO")
-    else:
-        st.markdown(risk_text)
-
-    if summary_lines:
-        st.info(summary_lines[0].replace("SUMMARY:", "**Summary:**"))
-
-    with st.expander("📄 Full model response"):
-        st.text(risk_text)
+        with st.expander("📄 Full AI Response"):
+            st.text(risk_text)
+    
+    with tab3:
+        st.subheader("🤖 Analysis Details")
+        with st.expander("📌 Image Analysis Model", expanded=False):
+            st.code("Model: llava:7b (Vision)\nPurpose: Satellite image interpretation\nTemperature: 0.3 (deterministic)", language="bash")
+        
+        with st.expander("📌 Risk Assessment Model", expanded=False):
+            st.code("Model: llama3.2:3b (Text)\nPurpose: Environmental risk analysis\nTemperature: 0.1 (very deterministic)", language="bash")
+        
+        with st.expander("📍 Image Information", expanded=False):
+            st.write(f"**Path:** `{image_path.relative_to(ROOT_DIR)}`")
+            if image_path.exists():
+                st.write(f"**File size:** {image_path.stat().st_size / 1024:.1f} KB")
+                st.write(f"**Modified:** {datetime.fromtimestamp(image_path.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 def _show_quickstart_examples() -> None:
-    """Show a few preset interesting locations the user can jump to."""
+    """Show a few preset interesting locations with clickable Get Report buttons."""
     st.markdown("### 🌍 Quick-start locations")
-    st.markdown("These presets let you quickly test the pipeline on known areas:")
+    st.markdown("Click **Get Report** on any location to instantly analyze it:")
 
     examples = [
         ("🌲 Amazon Rainforest", -3.47, -62.21, 12),
@@ -561,4 +670,56 @@ def _show_quickstart_examples() -> None:
     for col, (label, e_lat, e_lon, e_zoom) in zip(cols, examples):
         with col:
             st.markdown(f"**{label}**")
-            st.caption(f"lat={e_lat}, lon={e_lon}, zoom={e_zoom}")
+            st.caption(f"`{e_lat:.2f}, {e_lon:.2f}`")
+            if st.button(
+                "📊 Get Report",
+                key=f"preset_{e_lat}_{e_lon}_{e_zoom}",
+                use_container_width=True,
+            ):
+                st.session_state.preset_lat = e_lat
+                st.session_state.preset_lon = e_lon
+                st.session_state.preset_zoom = e_zoom
+                st.session_state.run_preset = True
+                st.rerun()
+    
+    # Show search history if available
+    st.markdown("---")
+    history = _get_search_history(limit=6)
+    if history:
+        st.markdown("### 🕐 Search History")
+        st.markdown("Quick access to your recently analyzed locations:")
+        
+        hist_cols = st.columns(len(history))
+        for idx, row in enumerate(history):
+            try:
+                h_lat = float(row.get("latitude", 0))
+                h_lon = float(row.get("longitude", 0))
+                h_zoom = int(row.get("zoom", 0))
+                h_timestamp = row.get("timestamp", "Unknown")
+                
+                # Format friendly timestamp
+                try:
+                    from datetime import datetime as dt
+                    ts = dt.fromisoformat(h_timestamp).strftime("%b %d, %H:%M")
+                except:
+                    ts = h_timestamp[:10] if len(h_timestamp) > 10 else h_timestamp
+                
+                location_name = _reverse_geocode(h_lat, h_lon)
+                
+                with hist_cols[idx]:
+                    st.markdown(f"**{location_name}**")
+                    st.caption(f"`{h_lat:.2f}, {h_lon:.2f}` • {ts}")
+                    if st.button(
+                        "📊 View Report",
+                        key=f"history_{h_lat}_{h_lon}_{h_zoom}_{idx}",
+                        use_container_width=True,
+                    ):
+                        st.session_state.preset_lat = h_lat
+                        st.session_state.preset_lon = h_lon
+                        st.session_state.preset_zoom = h_zoom
+                        st.session_state.run_preset = True
+                        st.rerun()
+            except (ValueError, TypeError):
+                continue
+    else:
+        st.markdown(":gray-background[_No search history yet. Analyze a location to get started!_]")
