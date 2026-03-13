@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import math
 import os
 import subprocess
@@ -62,6 +63,7 @@ ROOT_DIR = Path(__file__).parent.parent
 IMAGES_DIR = ROOT_DIR / "images"
 DATABASE_DIR = ROOT_DIR / "database"
 DATABASE_CSV = DATABASE_DIR / "images.csv"
+SEARCH_HISTORY_JSON = DATABASE_DIR / "search_history.json"
 MODELS_YAML = ROOT_DIR / "models.yaml"
 
 IMAGES_DIR.mkdir(exist_ok=True)
@@ -323,27 +325,47 @@ def _append_to_database(row: dict) -> None:
         writer.writerow(row)
 
 
-def _get_search_history(limit: int = 5) -> list[dict]:
-    """Get recently searched locations (deduplicated by lat/lon/zoom) from the database."""
-    db_rows = _read_database()
-    if not db_rows:
-        return []
-    
-    # Deduplicate by location, keeping the most recent entry for each unique location
-    seen = {}
-    for row in reversed(db_rows):  # Reverse to process newest first
+def _load_search_history() -> list[dict]:
+    """Load search history from JSON file."""
+    if SEARCH_HISTORY_JSON.exists():
         try:
-            lat = float(row.get("latitude", 0))
-            lon = float(row.get("longitude", 0))
-            zoom = int(row.get("zoom", 0))
-            key = _image_key(lat, lon, zoom)
-            if key not in seen:
-                seen[key] = row
-        except (ValueError, TypeError):
-            continue
+            with open(SEARCH_HISTORY_JSON, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return []
+    return []
+
+
+def _save_search_history_entry(location_name: str, lat: float, lon: float, zoom: int) -> None:
+    """Save a new search history entry to JSON file."""
+    history = _load_search_history()
     
-    # Return the most recent unique locations
-    return list(seen.values())[:limit]
+    # Check if this location already exists (deduplicate)
+    key = _image_key(lat, lon, zoom)
+    history = [h for h in history if _image_key(float(h.get("latitude", 0)), float(h.get("longitude", 0)), int(h.get("zoom", 0))) != key]
+    
+    # Add the new entry at the beginning
+    new_entry = {
+        "location_name": location_name,
+        "latitude": lat,
+        "longitude": lon,
+        "zoom": zoom,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+    history.insert(0, new_entry)
+    
+    # Keep only last 20 searches
+    history = history[:20]
+    
+    # Write back to file
+    with open(SEARCH_HISTORY_JSON, "w", encoding="utf-8") as f:
+        json.dump(history, f, indent=2, ensure_ascii=False)
+
+
+def _get_search_history(limit: int = 6) -> list[dict]:
+    """Get recently searched locations from JSON file."""
+    history = _load_search_history()
+    return history[:limit]
 
 
 # ---------------------------------------------------------------------------
@@ -363,11 +385,11 @@ def render() -> None:
     tile_cfg = config.get("tile_settings", {})
 
     # Clickable header button to reset and go back to main
-    col1, col2 = st.columns([0.9, 0.1])
+    col1, col2 = st.columns([0.85, 0.15])
     with col1:
         st.title("🛰️ AI Environmental Risk Analyser")
     with col2:
-        if st.button("↩️", help="Back to main page", key="header_back"):
+        if st.button("↩️ Back", help="Return to main page", key="header_back", use_container_width=True):
             st.session_state.clear()
             st.rerun()
     st.markdown(
@@ -530,6 +552,10 @@ def render() -> None:
         )
         status.update(label="✅ Pipeline complete!", state="complete")
 
+    # Save to search history with location name
+    location_name = _reverse_geocode(lat, lon)
+    _save_search_history_entry(location_name, lat, lon, zoom)
+    
     _display_results(image_path, description, risk_text, danger, lat, lon, zoom)
     
     # Reset preset flag after displaying results
@@ -696,6 +722,7 @@ def _show_quickstart_examples() -> None:
                 h_lon = float(row.get("longitude", 0))
                 h_zoom = int(row.get("zoom", 0))
                 h_timestamp = row.get("timestamp", "Unknown")
+                location_name = row.get("location_name", "Unknown Location")  # Use stored name
                 
                 # Format friendly timestamp
                 try:
@@ -704,15 +731,12 @@ def _show_quickstart_examples() -> None:
                 except:
                     ts = h_timestamp[:10] if len(h_timestamp) > 10 else h_timestamp
                 
-                location_name = _reverse_geocode(h_lat, h_lon)
-                
                 with hist_cols[idx]:
                     st.markdown(f"**{location_name}**")
                     st.caption(f"`{h_lat:.2f}, {h_lon:.2f}` • {ts}")
                     if st.button(
                         "📊 View Report",
                         key=f"history_{h_lat}_{h_lon}_{h_zoom}_{idx}",
-                        use_container_width=True,
                     ):
                         st.session_state.preset_lat = h_lat
                         st.session_state.preset_lon = h_lon
