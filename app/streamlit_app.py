@@ -37,6 +37,10 @@ PAGES = {
     "🛰️ AI Risk Analyser": "ai",
 }
 
+# Initialize session state for page navigation
+if "current_page" not in st.session_state:
+    st.session_state.current_page = "maps"
+
 st.sidebar.image(
     "https://upload.wikimedia.org/wikipedia/commons/d/d0/Okavango_delta_-_Botswana_-_panoramio.jpg",
     use_container_width=True,
@@ -45,17 +49,37 @@ st.sidebar.image(
 st.sidebar.title("🌿 Project Okavango")
 st.sidebar.markdown("---")
 
-selected_page = st.sidebar.radio(
-    "Navigate",
-    options=list(PAGES.keys()),
-    label_visibility="collapsed",
-)
+# Navigation buttons instead of radio
+col1, col2 = st.sidebar.columns([1, 1])
+with col1:
+    if st.button(
+        "🌍 World Maps",
+        use_container_width=True,
+        type="primary" if st.session_state.current_page == "maps" else "secondary",
+    ):
+        st.session_state.current_page = "maps"
+        st.rerun()
+
+with col2:
+    if st.button(
+        "🛰️ AI Risk Analyser",
+        use_container_width=True,
+        type="primary" if st.session_state.current_page == "ai" else "secondary",
+    ):
+        st.session_state.current_page = "ai"
+        st.rerun()
+
+selected_page = None
+for page_name, page_id in PAGES.items():
+    if page_id == st.session_state.current_page:
+        selected_page = page_name
+        break
 
 
 # ---------------------------------------------------------------------------
 # Route to the correct page
 # ---------------------------------------------------------------------------
-if PAGES[selected_page] == "maps":
+if st.session_state.current_page == "maps":
     # -----------------------------------------------------------------------
     # PAGE 1 — World Maps (Part 1, unchanged)
     # -----------------------------------------------------------------------

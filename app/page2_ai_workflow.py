@@ -56,6 +56,18 @@ def _reverse_geocode(lat: float, lon: float) -> str:
         return f"{lat:.4f}, {lon:.4f}"
 
 
+def _geocode_location(location_name: str) -> tuple[float, float] | None:
+    """Convert location name to (lat, lon) coordinates using Nominatim."""
+    try:
+        geolocator = Nominatim(user_agent="project_okavango/1.0")
+        location = geolocator.geocode(location_name, timeout=5)
+        if location:
+            return (location.latitude, location.longitude)
+    except (GeocoderTimedOut, Exception):
+        pass
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -413,6 +425,22 @@ def render() -> None:
         lon = st.session_state.preset_lon
         zoom = st.session_state.preset_zoom
     else:
+        # Location search field
+        location_search = st.sidebar.text_input(
+            "🔍 Search for a location",
+            placeholder="e.g., London, Paris, Tokyo...",
+            help="Type a location name and press Enter to auto-fill coordinates",
+        )
+        
+        if location_search:
+            with st.sidebar.spinner("🔍 Finding coordinates..."):
+                coords = _geocode_location(location_search)
+                if coords:
+                    default_lat, default_lon = coords
+                    st.sidebar.success(f"✅ Found: {coords[0]:.4f}, {coords[1]:.4f}")
+                else:
+                    st.sidebar.error(f"❌ Location '{location_search}' not found")
+        
         lat = st.sidebar.number_input(
             "Latitude",
             min_value=-90.0,
@@ -438,27 +466,6 @@ def render() -> None:
         )
 
     run_btn = st.sidebar.button("🚀 Analyse Location", type="primary", use_container_width=True)
-
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("⭐ Quick Locations")
-    preset_locations = {
-        "Lisbon, Portugal": (38.7223, -9.1393, 12),
-        "Amazon Brazil": (-3.1190, -60.0217, 12),
-        "Indonesia Forest": (-2.5489, 113.2938, 12),
-        "Congo Basin": (0.5, 25.0, 11),
-        "Paris, France": (48.8566, 2.3522, 12),
-    }
-    selected_preset = st.sidebar.selectbox(
-        "Jump to preset:",
-        ["Custom"] + list(preset_locations.keys()),
-        index=0,
-    )
-    if selected_preset != "Custom" and selected_preset in preset_locations:
-        preset_lat, preset_lon, preset_zoom = preset_locations[selected_preset]
-        lat = preset_lat
-        lon = preset_lon
-        zoom = preset_zoom
-        st.sidebar.success(f"📍 Loaded: {selected_preset}")
 
     st.sidebar.markdown("---")
     st.sidebar.markdown(
