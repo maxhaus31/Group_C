@@ -45,10 +45,31 @@ st.sidebar.image(
 st.sidebar.title("🌿 Project Okavango")
 st.sidebar.markdown("---")
 
+st.sidebar.markdown("### Menu")
 selected_page = st.sidebar.radio(
     "Navigate",
     options=list(PAGES.keys()),
     label_visibility="collapsed",
+)
+
+st.sidebar.markdown(
+    """
+    <style>
+    div[role='radiogroup'] label {
+        font-weight: 600;
+        font-size: 1rem;
+        padding: 6px 0px;
+        cursor: pointer;
+    }
+    div[role='radiogroup'] label:hover {
+        text-decoration: underline;
+    }
+    div[role='radiogroup'] > label > div:first-child {
+        display: none;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 
@@ -140,7 +161,9 @@ if PAGES[selected_page] == "maps":
     st.sidebar.markdown("---")
     st.sidebar.markdown(
         "**Team:** Korbinian Dietl · Jonas Knosp · Maximilian Haussmann  \n"
-        "**Data:** Our World in Data · Natural Earth · ESRI"
+        "<br>"
+        "**Data:** Our World in Data · Natural Earth · ESRI",
+        unsafe_allow_html=True,
     )
 
 else:

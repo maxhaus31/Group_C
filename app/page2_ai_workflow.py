@@ -29,6 +29,7 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+import pandas as pd
 
 import requests
 import streamlit as st
@@ -42,17 +43,27 @@ from PIL import Image
 # ---------------------------------------------------------------------------
 
 def _reverse_geocode(lat: float, lon: float) -> str:
-    """Get city/region name from coordinates using OpenStreetMap Nominatim."""
+    """Get city/region name from coordinates using OpenCage API."""
+    OPENCAGE_API_KEY = "07f0a2268fd346b7ba02021baff180c0"
     try:
-        geolocator = Nominatim(user_agent="project_okavango/1.0")
-        location = geolocator.reverse(f"{lat}, {lon}", language="en", timeout=5)
-        address_parts = location.address.split(",")
-        if len(address_parts) >= 2:
-            city = address_parts[-3].strip() if len(address_parts) > 2 else address_parts[0].strip()
-            country = address_parts[-1].strip()
-            return f"{city}, {country}"
-        return location.address
-    except (GeocoderTimedOut, Exception):
+        url = f"https://api.opencagedata.com/geocode/v1/json?q={lat}+{lon}&key={OPENCAGE_API_KEY}&language=en&limit=1&no_annotations=1"
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        if data["results"]:
+            components = data["results"][0]["components"]
+            city = (
+                components.get("city")
+                or components.get("town")
+                or components.get("village")
+                or components.get("state")
+                or components.get("region")
+                or ""
+            )
+            country = components.get("country", "")
+            return f"{city}, {country}" if city else country or f"{lat:.4f}, {lon:.4f}"
+        return f"{lat:.4f}, {lon:.4f}"
+    except Exception:
         return f"{lat:.4f}, {lon:.4f}"
 
 
@@ -72,8 +83,8 @@ DATABASE_DIR.mkdir(exist_ok=True)
 # Ensure CSV exists with headers
 if not DATABASE_CSV.exists():
     DATABASE_CSV.write_text(
-        "timestamp,latitude,longitude,zoom,image_path,"
-        "image_description,image_prompt,image_model,"
+        "timestamp,latitude,longitude,zoom,location_name,"
+        "image_path,image_description,image_prompt,image_model,"
         "text_description,text_prompt,text_model,danger\n"
     )
 
@@ -313,14 +324,20 @@ def _find_cached(lat: float, lon: float, zoom: int) -> dict | None:
 def _append_to_database(row: dict) -> None:
     """Append a result row to images.csv."""
     fieldnames = [
-        "timestamp", "latitude", "longitude", "zoom",
+        "timestamp", "latitude", "longitude", "zoom", "location_name",
         "image_path", "image_description", "image_prompt", "image_model",
         "text_description", "text_prompt", "text_model", "danger",
     ]
-    file_exists = DATABASE_CSV.exists()
+    # Check if file is empty or missing (the pre-created file may have no header)
+    has_header = False
+    if DATABASE_CSV.exists():
+        with open(DATABASE_CSV, "r", encoding="utf-8") as f:
+            first_line = f.readline().strip()
+            has_header = first_line.startswith("timestamp")
+
     with open(DATABASE_CSV, "a", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
-        if not file_exists:
+        if not has_header:
             writer.writeheader()
         writer.writerow(row)
 
@@ -461,15 +478,19 @@ def render() -> None:
         st.sidebar.success(f"📍 Loaded: {selected_preset}")
 
     st.sidebar.markdown("---")
+    """
     st.sidebar.markdown(
         f"**Image model:** `{config.get('image_analysis', {}).get('model', 'llava:7b')}`  \n"
         f"**Risk model:** `{config.get('risk_assessment', {}).get('model', 'llama3.2:3b')}`  \n"
         "_Edit `models.yaml` to change._"
     )
     st.sidebar.markdown("---")
+    """
     st.sidebar.markdown(
         "**Team:** Korbinian Dietl · Jonas Knosp · Maximilian Haussmann  \n"
-        "**Data:** Our World in Data · Natural Earth · ESRI"
+        "<br>"
+        "**Data:** Our World in Data · Natural Earth · ESRI",
+        unsafe_allow_html=True,
     )
 
     # -----------------------------------------------------------------------
@@ -480,7 +501,7 @@ def render() -> None:
     # Check if we should run the pipeline (either button click or preset)
     should_run = run_btn or st.session_state.run_preset
 
-    if cached and not should_run:
+    if cached and should_run:
         st.info("⚡ **Loaded from cache** — this location was already analysed.")
         _display_results(
             image_path=Path(cached["image_path"]),
@@ -503,7 +524,7 @@ def render() -> None:
     # -----------------------------------------------------------------------
     # Run the full pipeline
     # -----------------------------------------------------------------------
-    with st.status("Running AI analysis pipeline…", expanded=True) as status:
+    with st.status("Running AI analysis …", expanded=True) as status:
 
         # Step 1: fetch satellite image
         st.write("📡 Fetching satellite image from ESRI World Imagery…")
@@ -513,7 +534,8 @@ def render() -> None:
             st.error(f"Failed to fetch image: {exc}")
             return
         image_path = save_image(img, lat, lon, zoom)
-        st.write(f"✅ Image saved to `{image_path.relative_to(ROOT_DIR)}`")
+        st.write(f"✅ Image saved!")
+        # to `{image_path.relative_to(ROOT_DIR)}`")
 
         # Step 2: describe image
         st.write("🔍 Describing image with vision model…")
@@ -540,6 +562,7 @@ def render() -> None:
                 "latitude": lat,
                 "longitude": lon,
                 "zoom": zoom,
+                "location_name": _reverse_geocode(lat, lon),
                 "image_path": str(image_path),
                 "image_description": description,
                 "image_prompt": config["image_analysis"]["prompt"],
@@ -686,19 +709,18 @@ def _show_quickstart_examples() -> None:
 
     examples = [
         ("🌲 Amazon Rainforest", -3.47, -62.21, 12),
-        ("🏜️ Sahara Desert edge", 15.37, 2.01, 11),
-        ("🌿 Borneo deforestation", 1.29, 114.57, 13),
-        ("🏙️ São Paulo sprawl", -23.55, -46.63, 12),
-        ("🌊 Aral Sea shrinkage", 45.0, 60.0, 10),
+        ("🏜️ Sahara Desert Edge", 15.37, 2.01, 11),
+        ("🌿 Borneo Deforestation", 1.29, 114.57, 13),
+        ("🏙️ São Paulo Sprawl", -23.55, -46.63, 12),
+        ("🌊 Aral Sea Shrinkage", 45.0, 60.0, 10),
     ]
 
     cols = st.columns(len(examples))
     for col, (label, e_lat, e_lon, e_zoom) in zip(cols, examples):
         with col:
             st.markdown(f"**{label}**")
-            st.caption(f"`{e_lat:.2f}, {e_lon:.2f}`")
             if st.button(
-                "📊 Get Report",
+                "Dive in!",
                 key=f"preset_{e_lat}_{e_lon}_{e_zoom}",
                 use_container_width=True,
             ):
@@ -707,43 +729,59 @@ def _show_quickstart_examples() -> None:
                 st.session_state.preset_zoom = e_zoom
                 st.session_state.run_preset = True
                 st.rerun()
-    
-    # Show search history if available
+
+    # --- Search history from images.csv ---
     st.markdown("---")
-    history = _get_search_history(limit=6)
-    if history:
-        st.markdown("### 🕐 Search History")
-        st.markdown("Quick access to your recently analyzed locations:")
-        
-        hist_cols = st.columns(len(history))
-        for idx, row in enumerate(history):
-            try:
-                h_lat = float(row.get("latitude", 0))
-                h_lon = float(row.get("longitude", 0))
-                h_zoom = int(row.get("zoom", 0))
-                h_timestamp = row.get("timestamp", "Unknown")
-                location_name = row.get("location_name", "Unknown Location")  # Use stored name
-                
-                # Format friendly timestamp
-                try:
-                    from datetime import datetime as dt
-                    ts = dt.fromisoformat(h_timestamp).strftime("%b %d, %H:%M")
-                except:
-                    ts = h_timestamp[:10] if len(h_timestamp) > 10 else h_timestamp
-                
-                with hist_cols[idx]:
-                    st.markdown(f"**{location_name}**")
-                    st.caption(f"`{h_lat:.2f}, {h_lon:.2f}` • {ts}")
-                    if st.button(
-                        "📊 View Report",
-                        key=f"history_{h_lat}_{h_lon}_{h_zoom}_{idx}",
-                    ):
-                        st.session_state.preset_lat = h_lat
-                        st.session_state.preset_lon = h_lon
-                        st.session_state.preset_zoom = h_zoom
-                        st.session_state.run_preset = True
-                        st.rerun()
-            except (ValueError, TypeError):
-                continue
-    else:
+    rows = list(reversed(_read_database()))
+    if not rows:
         st.markdown(":gray-background[_No search history yet. Analyze a location to get started!_]")
+        return
+
+    st.markdown("### 🕐 Search History")
+    st.markdown("Click **Re-run** on any row to start the analysis again with those coordinates.")
+
+    import pandas as pd
+    df_hist = pd.DataFrame(rows)
+    if df_hist.empty:
+        st.markdown(":gray-background[_No completed analyses in the database yet._]")
+        return
+
+    if isinstance(df_hist.columns[0], int):
+        df_hist.columns = [
+            "timestamp", "latitude", "longitude", "zoom", "location_name",
+            "image_path", "image_description", "image_prompt", "image_model",
+            "text_description", "text_prompt", "text_model", "danger"
+        ]
+
+    if not {"timestamp", "latitude", "longitude", "zoom", "location_name", "danger"}.issubset(df_hist.columns):
+        st.warning(f"Unexpected columns: {df_hist.columns.tolist()}")
+        return
+
+    df_hist = df_hist[["location_name", "timestamp", "latitude", "longitude", "zoom", "danger"]]
+    df_hist["latitude"] = df_hist["latitude"].astype(float).round(4)
+    df_hist["longitude"] = df_hist["longitude"].astype(float).round(4)
+    df_hist["zoom"] = df_hist["zoom"].astype(int)
+    df_hist["danger"] = df_hist["danger"].str.strip().str.upper().map({"Y": "🚨 Yes", "N": "✅ No"})
+    df_hist["timestamp"] = pd.to_datetime(df_hist["timestamp"], errors="coerce").dt.strftime("%Y-%m-%d %H:%M")
+    df_hist["location_name"] = df_hist["location_name"].astype(str)
+
+    # Header row (7 columns: location, timestamp, lat, lon, zoom, danger, button)
+    header = st.columns([2, 2, 1, 1, 1, 1, 1])
+    for col, label in zip(header, ["Location", "Timestamp", "Latitude", "Longitude", "Zoom", "Danger", ""]):
+        col.markdown(f"<span style='font-weight:600; color: black; font-size:1.2em'>{label}</span>",
+                     unsafe_allow_html=True)
+
+    for idx, row in df_hist.iterrows():
+        c_loc, c_ts, c_lat, c_lon, c_zoom, c_danger, c_btn = st.columns([2, 2, 1, 1, 1, 1, 1])
+        c_loc.write(row["location_name"])
+        c_ts.write(row["timestamp"])
+        c_lat.write(row["latitude"])
+        c_lon.write(row["longitude"])
+        c_zoom.write(row["zoom"])
+        c_danger.write(row["danger"])
+        if c_btn.button("▶ Re-run", key=f"csv_hist_{idx}", use_container_width=True):
+            st.session_state.preset_lat = float(rows[idx]["latitude"])
+            st.session_state.preset_lon = float(rows[idx]["longitude"])
+            st.session_state.preset_zoom = int(rows[idx]["zoom"])
+            st.session_state.run_preset = True
+            st.rerun()
