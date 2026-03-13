@@ -60,3 +60,28 @@ Q5: YES/NO
 DANGER: NO
 SUMMARY: The satellite image suggests a relatively pristine desert landscape with minimal signs of human impact, indicating a low risk of environmental degradation or harm.","You are an environmental risk expert. Given the following satellite image description, answer YES or NO to each of these questions, then give a final risk verdict. Questions: 1. Is there visible deforestation or loss of tree cover? 2. Are there signs of soil erosion or land degradation? 3. Is there evidence of urban sprawl encroaching on natural areas? 4. Are there signs of water body shrinkage or pollution? 5. Is biodiversity habitat visibly fragmented or destroyed? Respond in this exact format: Q1: YES/NO Q2: YES/NO Q3: YES/NO Q4: YES/NO Q5: YES/NO DANGER: YES/NO SUMMARY: <one sentence explanation>
 ",llama3.2:3b,N
+2026-03-13T11:57:31.647990,38.725,-9.15,12,/Users/max/Desktop/AdvancedProgramming_GroupProject/images/38.7250_-9.1500_z12.png,"The image is a satellite view of a coastal area with a mix of natural and urban features. There are several distinct areas within the frame:
+
+1. **Urban Area**: A densely populated area with buildings, roads, and infrastructure can be seen on the right side of the image. This includes a large concentration of structures that appear to be residential or commercial buildings, indicating a developed urban environment.
+
+2. **Coastal Zone**: The coastline is visible along the bottom edge of the image, with a clear demarcation between land and water. There are no signs of significant erosion or coastal degradation evident from this perspective.
+
+3. **Water Bodies**: A large body of water occupies the lower part of the image, suggesting it could be an ocean or a sea. The water appears calm with no visible signs of pollution or contamination.
+
+4. **Vegetation**: There are patches of green vegetation scattered across the landscape, indicating areas of natural habitat within the urbanized region. These green spaces appear to be well-maintained and not significantly impacted by human activity.
+
+5. **Land Cover**: The majority of the land is covered with a mix of urban development and greenery. There are no large areas of bare land or deforestation visible from this perspective.
+
+6. **Human Activity**: There are no signs of major industrial activities or pollution sources that stand out in the image. However, the presence of buildings and infrastructure suggests ongoing human activity.
+
+7. **Environmental Changes/Degradation**: From this satellite view, there is no immediate evidence of significant environmental changes or degradation. The landscape appears to be relatively stable with no visible signs of deforestation or large-scale land use changes.
+
+Overall, the image presents a snapshot of a coastal urban area that seems to maintain a balance between natural and developed environments.","You are an environmental analyst looking at a satellite image. Describe what you see in detail: land cover, vegetation, water bodies, urban areas, signs of human activity, and any visible environmental changes or degradation. Be specific and concise.
+",llava:7b,"Q1: YES/NO
+Q2: NO/YES
+Q3: NO/YES
+Q4: NO/YES
+Q5: NO/YES
+DANGER: NO
+SUMMARY: The satellite image suggests a relatively stable coastal urban area with some signs of environmental degradation, but overall, the landscape appears to maintain a balance between natural and developed environments.","You are an environmental risk expert. Given the following satellite image description, answer YES or NO to each of these questions, then give a final risk verdict. Questions: 1. Is there visible deforestation or loss of tree cover? 2. Are there signs of soil erosion or land degradation? 3. Is there evidence of urban sprawl encroaching on natural areas? 4. Are there signs of water body shrinkage or pollution? 5. Is biodiversity habitat visibly fragmented or destroyed? Respond in this exact format: Q1: YES/NO Q2: YES/NO Q3: YES/NO Q4: YES/NO Q5: YES/NO DANGER: YES/NO SUMMARY: <one sentence explanation>
+",llama3.2:3b,N
