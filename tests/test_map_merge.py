@@ -38,7 +38,7 @@ def _write_csv(
     """
     Write test CSV data in Our World in Data format.
 
-    Creates minimal CSV files with Entity/Code/Year/metric columns that
+    Creates minimal CSV files with entity/code/year/metric columns that
     merge_datasets_with_map requires.
     """
     pd.DataFrame(rows).to_csv(path, index=False)
@@ -69,9 +69,9 @@ def test_returns_dict_with_all_dataset_keys(tmp_downloads: str) -> None:
     _prepare_map_and_empty_zip(tmp_downloads, world)
 
     base_rows = [
-        {"Entity": "Country_AAA", "Code": "AAA", "Year": 2020, "metric": 1.0},
-        {"Entity": "Country_BBB", "Code": "BBB", "Year": 2020, "metric": 2.0},
-        {"Entity": "Country_CCC", "Code": "CCC", "Year": 2020, "metric": 3.0},
+        {"entity": "Country_AAA", "code": "AAA", "year": 2020, "metric": 1.0},
+        {"entity": "Country_BBB", "code": "BBB", "year": 2020, "metric": 2.0},
+        {"entity": "Country_CCC", "code": "CCC", "year": 2020, "metric": 3.0},
     ]
 
     for name in CSV_DATASETS:
@@ -103,13 +103,13 @@ def test_filters_out_aggregate_and_invalid_codes(tmp_downloads: str) -> None:
     _prepare_map_and_empty_zip(tmp_downloads, world)
 
     valid_rows = [
-        {"Entity": "Country_AAA", "Code": "AAA", "Year": 2020, "metric": 1.0},
-        {"Entity": "Country_BBB", "Code": "BBB", "Year": 2020, "metric": 2.0},
+        {"entity": "Country_AAA", "code": "AAA", "year": 2020, "metric": 1.0},
+        {"entity": "Country_BBB", "code": "BBB", "year": 2020, "metric": 2.0},
     ]
     aggregate_rows = [
-        {"Entity": "World", "Code": "", "Year": 2020, "metric": 999.0},
-        {"Entity": "Europe", "Code": "EU27", "Year": 2020, "metric": 888.0},
-        {"Entity": "Invalid", "Code": "AB", "Year": 2020, "metric": 777.0},
+        {"entity": "World", "code": "", "year": 2020, "metric": 999.0},
+        {"entity": "Europe", "code": "EU27", "year": 2020, "metric": 888.0},
+        {"entity": "Invalid", "code": "AB", "year": 2020, "metric": 777.0},
     ]
     all_rows = valid_rows + aggregate_rows
 
@@ -143,8 +143,8 @@ def test_left_join_preserves_all_map_countries(tmp_downloads: str) -> None:
     _prepare_map_and_empty_zip(tmp_downloads, world)
 
     rows = [
-        {"Entity": "Country_AAA", "Code": "AAA", "Year": 2020, "metric": 5.0},
-        {"Entity": "Country_BBB", "Code": "BBB", "Year": 2020, "metric": 6.0},
+        {"entity": "Country_AAA", "code": "AAA", "year": 2020, "metric": 5.0},
+        {"entity": "Country_BBB", "code": "BBB", "year": 2020, "metric": 6.0},
     ]
 
     for name in CSV_DATASETS:

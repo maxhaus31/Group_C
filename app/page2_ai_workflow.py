@@ -67,6 +67,18 @@ def _reverse_geocode(lat: float, lon: float) -> str:
         return f"{lat:.4f}, {lon:.4f}"
 
 
+def _geocode_location(location_name: str) -> tuple[float, float] | None:
+    """Convert location name to (lat, lon) coordinates using Nominatim."""
+    try:
+        geolocator = Nominatim(user_agent="project_okavango/1.0")
+        location = geolocator.geocode(location_name, timeout=5)
+        if location:
+            return (location.latitude, location.longitude)
+    except (GeocoderTimedOut, Exception):
+        pass
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -74,7 +86,6 @@ ROOT_DIR = Path(__file__).parent.parent
 IMAGES_DIR = ROOT_DIR / "images"
 DATABASE_DIR = ROOT_DIR / "database"
 DATABASE_CSV = DATABASE_DIR / "images.csv"
-SEARCH_HISTORY_JSON = DATABASE_DIR / "search_history.json"
 MODELS_YAML = ROOT_DIR / "models.yaml"
 
 IMAGES_DIR.mkdir(exist_ok=True)
@@ -342,47 +353,7 @@ def _append_to_database(row: dict) -> None:
         writer.writerow(row)
 
 
-def _load_search_history() -> list[dict]:
-    """Load search history from JSON file."""
-    if SEARCH_HISTORY_JSON.exists():
-        try:
-            with open(SEARCH_HISTORY_JSON, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            return []
-    return []
 
-
-def _save_search_history_entry(location_name: str, lat: float, lon: float, zoom: int) -> None:
-    """Save a new search history entry to JSON file."""
-    history = _load_search_history()
-    
-    # Check if this location already exists (deduplicate)
-    key = _image_key(lat, lon, zoom)
-    history = [h for h in history if _image_key(float(h.get("latitude", 0)), float(h.get("longitude", 0)), int(h.get("zoom", 0))) != key]
-    
-    # Add the new entry at the beginning
-    new_entry = {
-        "location_name": location_name,
-        "latitude": lat,
-        "longitude": lon,
-        "zoom": zoom,
-        "timestamp": datetime.utcnow().isoformat(),
-    }
-    history.insert(0, new_entry)
-    
-    # Keep only last 20 searches
-    history = history[:20]
-    
-    # Write back to file
-    with open(SEARCH_HISTORY_JSON, "w", encoding="utf-8") as f:
-        json.dump(history, f, indent=2, ensure_ascii=False)
-
-
-def _get_search_history(limit: int = 6) -> list[dict]:
-    """Get recently searched locations from JSON file."""
-    history = _load_search_history()
-    return history[:limit]
 
 
 # ---------------------------------------------------------------------------
@@ -430,6 +401,22 @@ def render() -> None:
         lon = st.session_state.preset_lon
         zoom = st.session_state.preset_zoom
     else:
+        # Location search field
+        location_search = st.sidebar.text_input(
+            "🔍 Search for a location",
+            placeholder="e.g., London, Paris, Tokyo...",
+            help="Type a location name and press Enter to auto-fill coordinates",
+        )
+        
+        if location_search:
+            with st.sidebar.spinner("🔍 Finding coordinates..."):
+                coords = _geocode_location(location_search)
+                if coords:
+                    default_lat, default_lon = coords
+                    st.sidebar.success(f"✅ Found: {coords[0]:.4f}, {coords[1]:.4f}")
+                else:
+                    st.sidebar.error(f"❌ Location '{location_search}' not found")
+        
         lat = st.sidebar.number_input(
             "Latitude",
             min_value=-90.0,
@@ -575,10 +562,6 @@ def render() -> None:
         )
         status.update(label="✅ Pipeline complete!", state="complete")
 
-    # Save to search history with location name
-    location_name = _reverse_geocode(lat, lon)
-    _save_search_history_entry(location_name, lat, lon, zoom)
-    
     _display_results(image_path, description, risk_text, danger, lat, lon, zoom)
     
     # Reset preset flag after displaying results
