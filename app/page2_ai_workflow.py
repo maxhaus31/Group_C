@@ -41,10 +41,10 @@ from PIL import Image
 # ---------------------------------------------------------------------------
 # Location helper
 # ---------------------------------------------------------------------------
+OPENCAGE_API_KEY = "07f0a2268fd346b7ba02021baff180c0"
 
 def _reverse_geocode(lat: float, lon: float) -> str:
     """Get city/region name from coordinates using OpenCage API."""
-    OPENCAGE_API_KEY = "07f0a2268fd346b7ba02021baff180c0"
     try:
         url = f"https://api.opencagedata.com/geocode/v1/json?q={lat}+{lon}&key={OPENCAGE_API_KEY}&language=en&limit=1&no_annotations=1"
         response = requests.get(url, timeout=5)
@@ -68,15 +68,34 @@ def _reverse_geocode(lat: float, lon: float) -> str:
 
 
 def _geocode_location(location_name: str) -> tuple[float, float] | None:
-    """Convert location name to (lat, lon) coordinates using Nominatim."""
+    """Convert location name to (lat, lon) coordinates using OpenCage API."""
     try:
-        geolocator = Nominatim(user_agent="project_okavango/1.0")
-        location = geolocator.geocode(location_name, timeout=5)
-        if location:
-            return (location.latitude, location.longitude)
-    except (GeocoderTimedOut, Exception):
+        url = f"https://api.opencagedata.com/geocode/v1/json?q={requests.utils.quote(location_name)}&key={OPENCAGE_API_KEY}&language=en&limit=1&no_annotations=1"
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        if data["results"]:
+            lat = data["results"][0]["geometry"]["lat"]
+            lon = data["results"][0]["geometry"]["lng"]
+            return (lat, lon)
+    except Exception:
         pass
     return None
+
+
+def _autocomplete_locations(query: str) -> list[str]:
+    """Return top 5 location suggestions for a partial query using OpenCage API."""
+    try:
+        url = f"https://api.opencagedata.com/geocode/v1/json?q={requests.utils.quote(query)}&key={OPENCAGE_API_KEY}&language=en&limit=5&no_annotations=1"
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        suggestions = []
+        for result in data["results"]:
+            suggestions.append(result["formatted"])
+        return suggestions
+    except Exception:
+        return []
 
 
 # ---------------------------------------------------------------------------
@@ -402,20 +421,36 @@ def render() -> None:
         zoom = st.session_state.preset_zoom
     else:
         # Location search field
+        if "location_search_input" not in st.session_state:
+            st.session_state.location_search_input = ""
+
         location_search = st.sidebar.text_input(
             "🔍 Search for a location",
             placeholder="e.g., London, Paris, Tokyo...",
-            help="Type a location name and press Enter to auto-fill coordinates",
+            help="Type at least 3 characters to see suggestions",
+            key="location_search_input",
         )
-        
-        if location_search:
+
+        suggestions = []
+        if location_search and len(location_search) >= 3:
+            suggestions = _autocomplete_locations(location_search)
+
+        if suggestions:
+            selected_suggestion = st.sidebar.selectbox(
+                "📍 Select a location",
+                options=suggestions,
+                index=0,
+                label_visibility="collapsed",
+            )
             with st.sidebar.spinner("🔍 Finding coordinates..."):
-                coords = _geocode_location(location_search)
+                coords = _geocode_location(selected_suggestion)
                 if coords:
                     default_lat, default_lon = coords
-                    st.sidebar.success(f"✅ Found: {coords[0]:.4f}, {coords[1]:.4f}")
+                    st.sidebar.success(f"✅ Lat: {coords[0]:.4f}, Lon: {coords[1]:.4f}")
                 else:
-                    st.sidebar.error(f"❌ Location '{location_search}' not found")
+                    st.sidebar.error("❌ Could not resolve coordinates")
+        elif location_search and len(location_search) >= 3:
+            st.sidebar.caption("No suggestions found.")
         
         lat = st.sidebar.number_input(
             "Latitude",
@@ -444,6 +479,7 @@ def render() -> None:
     run_btn = st.sidebar.button("🚀 Analyse Location", type="primary", use_container_width=True)
 
     st.sidebar.markdown("---")
+    """
     st.sidebar.subheader("⭐ Quick Locations")
     preset_locations = {
         "Lisbon, Portugal": (38.7223, -9.1393, 12),
@@ -465,6 +501,7 @@ def render() -> None:
         st.sidebar.success(f"📍 Loaded: {selected_preset}")
 
     st.sidebar.markdown("---")
+    """
     """
     st.sidebar.markdown(
         f"**Image model:** `{config.get('image_analysis', {}).get('model', 'llava:7b')}`  \n"
