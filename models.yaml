@@ -35,6 +35,6 @@ tile_settings:
   tile_url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
   tile_size: 256
   default_zoom: 12
-  default_lat: 48.8566
-  default_lon: 2.3522
+  default_lat: 38.7369
+  default_lon: -9.1426
   grid_size: 3

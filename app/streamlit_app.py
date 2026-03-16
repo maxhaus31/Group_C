@@ -75,6 +75,26 @@ for page_name, page_id in PAGES.items():
         selected_page = page_name
         break
 
+st.sidebar.markdown(
+    """
+    <style>
+    div[role='radiogroup'] label {
+        font-weight: 600;
+        font-size: 1rem;
+        padding: 6px 0px;
+        cursor: pointer;
+    }
+    div[role='radiogroup'] label:hover {
+        text-decoration: underline;
+    }
+    div[role='radiogroup'] > label > div:first-child {
+        display: none;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 # ---------------------------------------------------------------------------
 # Route to the correct page
@@ -164,7 +184,9 @@ if st.session_state.current_page == "maps":
     st.sidebar.markdown("---")
     st.sidebar.markdown(
         "**Team:** Korbinian Dietl · Jonas Knosp · Maximilian Haussmann  \n"
-        "**Data:** Our World in Data · Natural Earth · ESRI"
+        "<br>"
+        "**Data:** Our World in Data · Natural Earth · ESRI",
+        unsafe_allow_html=True,
     )
 
 else:
