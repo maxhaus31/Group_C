@@ -114,7 +114,7 @@ if st.session_state.current_page == "maps":
 
     data = load_data()
 
-    st.sidebar.markdown("---")
+    st.sidebar.markdown("<hr style='margin-top: 0; margin-bottom: 0;'>", unsafe_allow_html=True)
     st.sidebar.subheader("Dataset selector")
     dataset_options = list(data.DISPLAY_NAMES.keys())
     selected_key = st.sidebar.selectbox(
@@ -136,8 +136,8 @@ if st.session_state.current_page == "maps":
     st.info(f"**Countries with data:** {gdf[value_col].notna().sum()} / {len(gdf)}")
 
     def render_choropleth(gdf_plot, col: str, title: str) -> plt.Figure:
-        fig, ax = plt.subplots(1, 1, figsize=(18, 9), facecolor="#0e1117")
-        ax.set_facecolor("#0e1117")
+        fig, ax = plt.subplots(1, 1, figsize=(18, 9), facecolor="none")
+        ax.set_facecolor("none")
         gdf_plot[gdf_plot[col].isna()].plot(ax=ax, color="#3a3a3a", edgecolor="#555555", linewidth=0.3)
         cmap_map: dict[str, str] = {
             "annual_change_forest_area": "RdYlGn",
@@ -153,8 +153,8 @@ if st.session_state.current_page == "maps":
             legend_kwds={"label": col.replace("_", " ").title(), "orientation": "horizontal", "shrink": 0.5, "pad": 0.02, "fraction": 0.03},
         )
         for text in ax.get_figure().findobj(matplotlib.text.Text):
-            text.set_color("white")
-        ax.set_title(title, color="white", fontsize=16, pad=12)
+            text.set_color("black")
+        ax.set_title(title, color="black", fontsize=16, pad=12)
         ax.axis("off")
         fig.tight_layout(pad=0)
         return fig
@@ -172,8 +172,8 @@ if st.session_state.current_page == "maps":
     fig_bar = go.Figure()
     fig_bar.add_trace(go.Bar(x=bottom5["NAME"], y=bottom5[value_col], name="Bottom 5", marker_color=["#e74c3c"] * 5, text=bottom5[value_col].round(2), textposition="outside"))
     fig_bar.add_trace(go.Bar(x=top5["NAME"], y=top5[value_col], name="Top 5", marker_color=["#2ecc71"] * 5, text=top5[value_col].round(2), textposition="outside"))
-    fig_bar.update_layout(template="plotly_dark", paper_bgcolor="#0e1117", plot_bgcolor="#0e1117", font_color="white",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    fig_bar.update_layout(template="plotly_white", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                          font_color="black",        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         xaxis_title="Country", yaxis_title=axis_label, height=420, margin=dict(t=40, b=60), bargap=0.25)
     st.plotly_chart(fig_bar, use_container_width=True)
 
@@ -181,7 +181,7 @@ if st.session_state.current_page == "maps":
         display_cols = ["NAME", "CONTINENT", value_col]
         st.dataframe(gdf[display_cols].dropna(subset=[value_col]).sort_values(value_col, ascending=False).reset_index(drop=True), use_container_width=True)
 
-    st.sidebar.markdown("---")
+    st.sidebar.markdown("<hr style='margin-top: 0; margin-bottom: 0;'>", unsafe_allow_html=True)
     st.sidebar.markdown(
         "**Team:** Korbinian Dietl · Jonas Knosp · Maximilian Haussmann  \n"
         "<br>"
