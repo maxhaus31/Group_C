@@ -790,7 +790,7 @@ def _show_quickstart_examples() -> None:
     # Header row (7 columns: location, timestamp, lat, lon, zoom, danger, button)
     header = st.columns([2, 2, 1, 1, 1, 1, 1])
     for col, label in zip(header, ["Location", "Timestamp", "Latitude", "Longitude", "Zoom", "Danger", ""]):
-        col.markdown(f"<span style='font-weight:600; color: white; font-size:1.2em'>{label}</span>",
+        col.markdown(f"<span style='font-weight:600; color: black; font-size:1.2em'>{label}</span>",
                      unsafe_allow_html=True)
 
     for idx, row in df_hist.iterrows():
