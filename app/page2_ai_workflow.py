@@ -837,6 +837,6 @@ def _show_quickstart_examples() -> None:
     st.markdown("")
     col_l, col_mid, col_r = st.columns([2, 3, 2])
     with col_mid:
-        if st.button("🗑️ Remove Search History", use_container_width=True):
+        if st.button("🗑️ Delete Search History", use_container_width=True, help="Delete all rows besides the quicksearch entries"):
             _trim_database(keep=5)
             st.rerun()
