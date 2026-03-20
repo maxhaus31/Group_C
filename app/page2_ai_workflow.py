@@ -103,11 +103,13 @@ def _autocomplete_locations(query: str) -> list[str]:
 # ---------------------------------------------------------------------------
 ROOT_DIR = Path(__file__).parent.parent
 IMAGES_DIR = ROOT_DIR / "images"
+IMAGES_QUICKSEARCH_DIR = ROOT_DIR / "images_quicksearch"
 DATABASE_DIR = ROOT_DIR / "database"
 DATABASE_CSV = DATABASE_DIR / "images.csv"
 MODELS_YAML = ROOT_DIR / "models.yaml"
 
 IMAGES_DIR.mkdir(exist_ok=True)
+IMAGES_QUICKSEARCH_DIR.mkdir(exist_ok=True)
 DATABASE_DIR.mkdir(exist_ok=True)
 
 # Ensure CSV exists with headers
@@ -338,7 +340,11 @@ def _read_database() -> list[dict]:
 
 
 def _find_cached(lat: float, lon: float, zoom: int) -> dict | None:
-    """Return an existing database row for this lat/lon/zoom, or None."""
+    """Return an existing database row for this lat/lon/zoom, or None.
+
+    Also checks images_quicksearch/ as a fallback image source so pre-saved
+    quicksearch images are found even before the pipeline has ever run.
+    """
     key = _image_key(lat, lon, zoom)
     for row in _read_database():
         row_key = _image_key(
@@ -347,6 +353,13 @@ def _find_cached(lat: float, lon: float, zoom: int) -> dict | None:
             int(row.get("zoom", 0)),
         )
         if row_key == key:
+            # Resolve image path: prefer stored path, fall back to quicksearch dir
+            stored_path = Path(row.get("image_path", ""))
+            if not stored_path.exists():
+                quicksearch_path = IMAGES_QUICKSEARCH_DIR / f"{key}.png"
+                if quicksearch_path.exists():
+                    row = dict(row)  # make mutable copy
+                    row["image_path"] = str(quicksearch_path)
             return row
     return None
 
@@ -396,8 +409,9 @@ def render() -> None:
     with col1:
         st.title("🛰️ AI Environmental Risk Analyser")
     with col2:
-        if st.button("↩️ Back", help="Return to main page", key="header_back", use_container_width=True):
-            st.session_state.clear()
+        if st.button("↩️ Back", help="Return to overview", key="header_back", use_container_width=True):
+            st.session_state.run_preset = False
+            st.session_state.force_rerun = False
             st.rerun()
     st.markdown(
         "Select a location on Earth, fetch a satellite image, and let AI assess "
@@ -407,7 +421,7 @@ def render() -> None:
     # -----------------------------------------------------------------------
     # Sidebar controls
     # -----------------------------------------------------------------------
-    st.sidebar.markdown("---")
+    st.sidebar.markdown("<hr style='margin-top: 0; margin-bottom: 0;'>", unsafe_allow_html=True)
     st.sidebar.subheader("📍 Location Settings")
 
     # Use preset coordinates if a preset was clicked, otherwise use sidebar inputs
@@ -451,7 +465,7 @@ def render() -> None:
                     st.sidebar.error("❌ Could not resolve coordinates")
         elif location_search and len(location_search) >= 3:
             st.sidebar.caption("No suggestions found.")
-        
+
         lat = st.sidebar.number_input(
             "Latitude",
             min_value=-90.0,
@@ -479,37 +493,7 @@ def render() -> None:
     run_btn = st.sidebar.button("🚀 Analyse Location", type="primary", use_container_width=True)
 
     st.sidebar.markdown("---")
-    """
-    st.sidebar.subheader("⭐ Quick Locations")
-    preset_locations = {
-        "Lisbon, Portugal": (38.7223, -9.1393, 12),
-        "Amazon Brazil": (-3.1190, -60.0217, 12),
-        "Indonesia Forest": (-2.5489, 113.2938, 12),
-        "Congo Basin": (0.5, 25.0, 11),
-        "Paris, France": (48.8566, 2.3522, 12),
-    }
-    selected_preset = st.sidebar.selectbox(
-        "Jump to preset:",
-        ["Custom"] + list(preset_locations.keys()),
-        index=0,
-    )
-    if selected_preset != "Custom" and selected_preset in preset_locations:
-        preset_lat, preset_lon, preset_zoom = preset_locations[selected_preset]
-        lat = preset_lat
-        lon = preset_lon
-        zoom = preset_zoom
-        st.sidebar.success(f"📍 Loaded: {selected_preset}")
 
-    st.sidebar.markdown("---")
-    """
-    """
-    st.sidebar.markdown(
-        f"**Image model:** `{config.get('image_analysis', {}).get('model', 'llava:7b')}`  \n"
-        f"**Risk model:** `{config.get('risk_assessment', {}).get('model', 'llama3.2:3b')}`  \n"
-        "_Edit `models.yaml` to change._"
-    )
-    st.sidebar.markdown("---")
-    """
     st.sidebar.markdown(
         "**Team:** Korbinian Dietl · Jonas Knosp · Maximilian Haussmann  \n"
         "<br>"
@@ -521,12 +505,21 @@ def render() -> None:
     # Check cache before running pipeline
     # -----------------------------------------------------------------------
     cached = _find_cached(lat, lon, zoom)
-    
+
     # Check if we should run the pipeline (either button click or preset)
     should_run = run_btn or st.session_state.run_preset
 
-    if cached and should_run:
+    if not should_run:
+        st.markdown(
+            "👈 Set your coordinates and zoom in the sidebar, then click **Analyse Location**."
+        )
+        _show_quickstart_examples()
+        return
+
+    # If cached result exists, always display it — skip the pipeline entirely
+    if cached:
         st.info("⚡ **Loaded from cache** — this location was already analysed.")
+        st.session_state.run_preset = False
         _display_results(
             image_path=Path(cached["image_path"]),
             description=cached["image_description"],
@@ -535,6 +528,7 @@ def render() -> None:
             lat=lat,
             lon=lon,
             zoom=zoom,
+            location_name=cached.get("location_name"),
         )
         return
 
@@ -580,13 +574,14 @@ def render() -> None:
         st.write("✅ Risk assessment complete.")
 
         # Step 4: save to database
+        location_name = _reverse_geocode(lat, lon)
         _append_to_database(
             {
                 "timestamp": datetime.utcnow().isoformat(),
                 "latitude": lat,
                 "longitude": lon,
                 "zoom": zoom,
-                "location_name": _reverse_geocode(lat, lon),
+                "location_name": location_name,
                 "image_path": str(image_path),
                 "image_description": description,
                 "image_prompt": config["image_analysis"]["prompt"],
@@ -613,12 +608,10 @@ def _display_results(
     lat: float = None,
     lon: float = None,
     zoom: int = 12,
+    location_name: str = None,
 ) -> None:
-    """Render the image, description, and risk assessment with tabs and metrics."""
-
-    # Location header with metrics card
     if lat is not None and lon is not None:
-        location = _reverse_geocode(lat, lon)
+        location = location_name if location_name else _reverse_geocode(lat, lon)
         st.markdown(f"### 📍 {location}")
         
         metric_cols = st.columns(4)
@@ -725,9 +718,9 @@ def _display_results(
 def _show_quickstart_examples() -> None:
     """Show a few preset interesting locations with clickable Get Report buttons."""
     st.markdown("### 🌍 Quick-start locations")
-    st.markdown("Click **Get Report** on any location to instantly analyze it:")
+    st.markdown("Click **Dive In** on any location to instantly analyze it:")
 
-    examples = [
+    QUICKSEARCH_EXAMPLES = [
         ("🌲 Amazon Rainforest", -3.47, -62.21, 12),
         ("🏜️ Sahara Desert Edge", 15.37, 2.01, 11),
         ("🌿 Borneo Deforestation", 1.29, 114.57, 13),
@@ -735,14 +728,23 @@ def _show_quickstart_examples() -> None:
         ("🌊 Aral Sea Shrinkage", 45.0, 60.0, 10),
     ]
 
-    cols = st.columns(len(examples))
-    for col, (label, e_lat, e_lon, e_zoom) in zip(cols, examples):
+    cols = st.columns(len(QUICKSEARCH_EXAMPLES))
+    for col, (label, e_lat, e_lon, e_zoom) in zip(cols, QUICKSEARCH_EXAMPLES):
         with col:
-            st.markdown(f"**{label}**")
+            img_path = IMAGES_QUICKSEARCH_DIR / f"{_image_key(e_lat, e_lon, e_zoom)}.png"
+            if img_path.exists():
+                st.image(str(img_path), use_container_width=True)
+            cached_row = _find_cached(e_lat, e_lon, e_zoom)
+            location_sub = cached_row["location_name"] if cached_row and cached_row.get("location_name") else ""
+            st.markdown(
+                f"**{label}**"
+                + (f"<br><small style='color:grey'>{location_sub}</small>" if location_sub else ""),
+                unsafe_allow_html=True,
+            )
             if st.button(
-                "Dive in!",
-                key=f"preset_{e_lat}_{e_lon}_{e_zoom}",
-                use_container_width=True,
+                    "Dive in!",
+                    key=f"preset_{e_lat}_{e_lon}_{e_zoom}",
+                    use_container_width=True,
             ):
                 st.session_state.preset_lat = e_lat
                 st.session_state.preset_lon = e_lon
