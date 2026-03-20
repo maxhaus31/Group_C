@@ -384,6 +384,32 @@ def _append_to_database(row: dict) -> None:
             writer.writeheader()
         writer.writerow(row)
 
+def _trim_database(keep: int = 5) -> None:
+    """Delete all rows except the first `keep` entries, and clean up images/."""
+    rows = _read_database()
+    if len(rows) <= keep:
+        return
+    rows_to_keep = rows[:keep]
+
+    # Delete images from images/ for removed rows
+    rows_to_remove = rows[keep:]
+    for row in rows_to_remove:
+        img_path = Path(row.get("image_path", ""))
+        if img_path.exists() and IMAGES_DIR in img_path.parents:
+            try:
+                img_path.unlink()
+            except Exception:
+                pass
+
+    fieldnames = [
+        "timestamp", "latitude", "longitude", "zoom", "location_name",
+        "image_path", "image_description", "image_prompt", "image_model",
+        "text_description", "text_prompt", "text_model", "danger",
+    ]
+    with open(DATABASE_CSV, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows_to_keep)
 
 
 
@@ -806,4 +832,11 @@ def _show_quickstart_examples() -> None:
             st.session_state.preset_lon = float(rows[idx]["longitude"])
             st.session_state.preset_zoom = int(rows[idx]["zoom"])
             st.session_state.run_preset = True
+            st.rerun()
+
+    st.markdown("")
+    col_l, col_mid, col_r = st.columns([2, 3, 2])
+    with col_mid:
+        if st.button("🗑️ Remove Search History", use_container_width=True):
+            _trim_database(keep=5)
             st.rerun()
